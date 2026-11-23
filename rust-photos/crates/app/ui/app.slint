@@ -1,0 +1,142 @@
+import { Theme, Tr } from "theme.slint";
+import { App } from "state.slint";
+import { Icon, IconBtn, Btn } from "widgets.slint";
+import { GalleryView } from "gallery.slint";
+import { ViewerView } from "viewer.slint";
+import { EditorView } from "editor.slint";
+import { SettingsDialog, ConfirmDialog, PromptDialog, BatchDialog, DupDialog, AlbumPicker, AboutDialog } from "dialogs.slint";
+
+export { App, Theme, Tr }
+export { Palette } from "std-widgets.slint";
+export { Tile, Row, AlbumItem, InfoRow, Strip, DupItem, DupGroup, LayerItem, FilterItem } from "types.slint";
+
+component NavItem inherits Rectangle {
+    in property <image> glyph;
+    in property <string> label;
+    in property <bool> on: false;
+    in property <bool> compact: false;
+    callback clicked();
+    height: 38px;
+    border-radius: 5px;
+    background: on ? Theme.subtle-hover : ta.pressed ? Theme.subtle-press : ta.has-hover ? Theme.subtle-hover : transparent;
+    animate background { duration: Theme.t-fast; }
+    Rectangle { x: 0px; y: (parent.height - 16px) / 2; width: 3px; height: 16px; border-radius: 1.5px; background: Theme.accent; visible: on; }
+    Icon { glyph: root.glyph; size: 18px; x: 13px; y: (parent.height - 18px) / 2; tint: on ? Theme.accent-text : Theme.text; }
+    Text { x: 44px; width: parent.width - 52px; text: root.label; color: Theme.text; font-size: Theme.fs; vertical-alignment: center; overflow: elide; opacity: root.compact ? 0 : 1; animate opacity { duration: Theme.t-fast; } }
+    ta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+export component AppWindow inherits Window {
+    in property <string> title-text: "Rust Photos";
+    title: title-text;
+    background: Theme.app-bg;
+    min-width: 600px;
+    min-height: 440px;
+    preferred-width: 1280px;
+    preferred-height: 820px;
+    full-screen: App.fullscreen;
+    icon: @image-url("icon.svg");
+
+    property <bool> compact: App.nav-compact || self.width < 960px;
+    // the system theme can change while the app runs: refresh Mica and the accent shades
+    property <bool> dark-now: Theme.dark;
+    changed dark-now => { App.act("look-refresh", 0); }
+
+    fs := FocusScope {
+        key-pressed(e) => {
+            if (App.confirm-open || App.prompt-open || App.settings-open || App.batch-open || App.dup-open || App.about-open || App.album-pick-open) {
+                if (e.text == Key.Escape) { App.act("esc", 0); return accept; }
+                return reject;
+            }
+            if (e.text == Key.Escape) { App.act("esc", 0); return accept; }
+            if (App.view == 1) {
+                if (e.text == Key.LeftArrow) { App.act("prev", 0); return accept; }
+                if (e.text == Key.RightArrow) { App.act("next", 0); return accept; }
+                if (e.text == Key.Delete) { App.act("view-delete", 0); return accept; }
+                if (e.text == "f" || e.text == "F" || e.text == Key.F11) { App.act("fullscreen", 0); return accept; }
+                if (e.text == "i" || e.text == "I") { App.info-open = !App.info-open; App.act("info", 0); return accept; }
+                if (e.text == "e" || e.text == "E") { App.act("view-edit", 0); return accept; }
+                if (e.text == "r" && !e.modifiers.control) { App.act("view-rotate", 90); return accept; }
+                if (e.text == "R") { App.act("view-rotate", 270); return accept; }
+                if (e.text == " ") { App.act("slideshow", 0); return accept; }
+                if (e.text == "+" || e.text == "=") { viewer.zoom-step(1.25); return accept; }
+                if (e.text == "-") { viewer.zoom-step(0.8); return accept; }
+                if (e.text == "0") { viewer.fit-window(); return accept; }
+                if (e.text == "1") { viewer.actual-size(); return accept; }
+                if (e.text == "c" && e.modifiers.control) { App.act("view-copy", 0); return accept; }
+            }
+            if (App.view == 2) {
+                if (e.text == "z" && e.modifiers.control) { App.act("ed-undo", 0); return accept; }
+                if (e.text == "y" && e.modifiers.control) { App.act("ed-redo", 0); return accept; }
+                if (e.text == "s" && e.modifiers.control) { App.act("ed-save", 0); return accept; }
+            }
+            if (App.view == 0 && e.text == "a" && e.modifiers.control) { App.act("select-all", 0); return accept; }
+            if (e.text == "," && e.modifiers.control) { App.settings-open = true; return accept; }
+            reject
+        }
+
+        HorizontalLayout {
+            x: 0px; y: 0px; width: parent.width; height: parent.height;
+            if App.view == 0 : Rectangle {
+                width: root.compact ? 52px : 220px;
+                animate width { duration: Theme.t-med; easing: ease-out; }
+                VerticalLayout { padding: 4px; padding-top: 4px; spacing: 2px;
+                    Rectangle { height: 40px;
+                        IconBtn { x: 5px; y: 4px; glyph: @image-url("icons/panel-left.svg"); tip: Tr.t("nav.toggle"); enabled: root.width >= 960px; clicked => { App.act("nav-toggle", 0); } }
+                        if !root.compact : HorizontalLayout { x: 44px; width: parent.width - 48px; spacing: 8px; alignment: start;
+                            Image { source: @image-url("icon.svg"); width: 20px; height: 20px; y: 10px; }
+                            Text { text: Tr.t("app"); color: Theme.text; font-size: Theme.fs; font-weight: 600; vertical-alignment: center; overflow: elide; } }
+                    }
+                    NavItem { glyph: @image-url("icons/images.svg"); label: Tr.t("nav.gallery"); compact: root.compact; on: App.scope == 0; clicked => { App.act("scope", 0); } }
+                    NavItem { glyph: @image-url("icons/heart.svg"); label: Tr.t("nav.favorites"); compact: root.compact; on: App.scope == 1; clicked => { App.act("scope", 1); } }
+                    NavItem { glyph: @image-url("icons/folder-heart.svg"); label: Tr.t("nav.albums"); compact: root.compact; on: App.scope == 2 || App.scope == 3; clicked => { App.act("scope", 2); } }
+                    if App.has-current : NavItem { glyph: @image-url("icons/image.svg"); label: Tr.t("nav.viewer"); compact: root.compact; clicked => { App.act("goto-viewer", 0); } }
+                    Rectangle { vertical-stretch: 1; }
+                    NavItem { glyph: @image-url("icons/files.svg"); label: Tr.t("nav.duplicates"); compact: root.compact; clicked => { App.act("duplicates", 0); } }
+                    NavItem { glyph: @image-url("icons/settings.svg"); label: Tr.t("nav.settings"); compact: root.compact; clicked => { App.settings-open = true; } }
+                }
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+                background: App.view == 0 ? Theme.layer : transparent;
+                border-top-left-radius: App.view == 0 ? 8px : 0px;
+                border-width: App.view == 0 ? 1px : 0px;
+                border-color: Theme.stroke;
+                clip: true;
+                GalleryView { visible: App.view == 0; }
+                viewer := ViewerView { visible: App.view == 1; }
+                editor := EditorView { visible: App.view == 2; }
+            }
+        }
+    }
+
+    // drop zone
+    if App.drop-active : Rectangle {
+        background: Theme.accent.with-alpha(0.18); border-width: 2px; border-color: Theme.accent;
+        VerticalLayout { alignment: center; spacing: 10px;
+            Icon { glyph: @image-url("icons/download.svg"); size: 48px; tint: Theme.accent-text; x: (parent.width - 48px) / 2; }
+            Text { text: Tr.t("gal.drop"); color: Theme.accent-text; font-size: 22px * Theme.scale; font-weight: 600; horizontal-alignment: center; } }
+    }
+
+    // toast
+    if App.toast-visible : Rectangle {
+        x: (parent.width - self.width) / 2; y: parent.height - self.height - (App.view == 1 ? 120px : 28px);
+        width: min(parent.width - 32px, tr.preferred-width + 32px + (App.toast-action != "" ? 90px : 0px)); height: 44px;
+        border-radius: 6px; background: Theme.dark ? #3a3a3a : #ffffff; border-width: 1px; border-color: Theme.stroke-strong;
+        drop-shadow-blur: 16px; drop-shadow-color: #00000050; drop-shadow-offset-y: 4px;
+        HorizontalLayout { padding-left: 16px; padding-right: 8px; spacing: 10px;
+            Rectangle { width: 4px; height: 20px; y: 12px; border-radius: 2px; background: App.toast-kind == 3 ? #e5484d : App.toast-kind == 1 ? #30a46c : App.toast-kind == 2 ? #f5a623 : Theme.accent; }
+            tr := Text { text: App.toast-text; color: Theme.text; font-size: Theme.fs; vertical-alignment: center; overflow: elide; }
+            if App.toast-action != "" : Btn { y: 6px; text: App.toast-action; height: 32px; clicked => { App.act("toast-action", 0); } }
+        }
+    }
+
+    if App.settings-open : SettingsDialog { }
+    if App.album-pick-open : AlbumPicker { }
+    if App.batch-open : BatchDialog { }
+    if App.dup-open : DupDialog { }
+    if App.about-open : AboutDialog { }
+    if App.prompt-open : PromptDialog { }
+    if App.confirm-open : ConfirmDialog { }
+
+}

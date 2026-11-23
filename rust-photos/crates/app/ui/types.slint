@@ -1,0 +1,12 @@
+export struct Tile { idx: int, path: string, name: string, thumb: image, loaded: bool, fav: bool, selected: bool }
+export struct Row { head: bool, title: string, count: int, tiles: [Tile] }
+export struct AlbumItem { id: string, name: string, count: string, cover: image, has-cover: bool }
+export struct InfoRow { label: string, value: string }
+export struct Strip { idx: int, thumb: image, current: bool, loaded: bool }
+export struct Choice { label: string, desc: string }
+export struct SwatchItem { color: color, label: string }
+export struct DupItem { path: string, name: string, size: string, thumb: image, keep: bool }
+export struct DupGroup { title: string, items: [DupItem] }
+export struct LayerItem { id: int, label: string, kind: int }
+export struct FilterItem { id: string, label: string, thumb: image }
+export struct PresetItem { id: string, name: string }

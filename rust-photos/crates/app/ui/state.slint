@@ -1,0 +1,175 @@
+import { Row, AlbumItem, InfoRow, Strip, DupGroup, LayerItem, FilterItem } from "types.slint";
+
+// Everything the screens read from Rust, and every action they send back.
+export global App {
+    // ---- navigation ----
+    in-out property <int> view: 0;            // 0 gallery, 1 viewer, 2 editor
+    in-out property <int> scope: 0;           // 0 all, 1 favorites, 2 albums, 3 one album
+    in property <string> scope-title;
+    in property <bool> has-current: false;
+    in-out property <bool> nav-compact: false;
+    in-out property <bool> fullscreen: false;
+    in property <bool> editor-dirty: false;
+
+    // ---- gallery ----
+    in property <[Row]> rows;
+    in property <bool> loading: false;
+    in property <bool> loaded: false;
+    in property <string> count-text;
+    in property <string> empty-title;
+    in property <string> empty-desc;
+    in-out property <string> search;
+    in property <[string]> folder-items;
+    in-out property <int> folder-index: 0;
+    in property <[string]> format-items;
+    in-out property <int> format-index: 0;
+    in property <[string]> sort-items;
+    in-out property <int> sort-index: 0;
+    in-out property <int> tile-size: 190;
+    in-out property <bool> group: true;
+    in property <length> tile-w: 190px;
+    in-out property <length> grid-width: 800px;
+    in-out property <bool> selecting: false;
+    in property <int> sel-count: 0;
+    in property <string> sel-text;
+    in property <[AlbumItem]> albums;
+    in-out property <bool> drop-active: false;
+
+    // ---- viewer ----
+    in property <image> view-image;
+    in property <int> view-w: 0;
+    in property <int> view-h: 0;
+    in property <int> view-rev: 0;
+    in property <bool> view-loading: false;
+    in property <bool> view-failed: false;
+    in property <string> view-name;
+    in property <string> view-index-text;
+    in property <bool> view-fav: false;
+    in property <bool> has-prev: false;
+    in property <bool> has-next: false;
+    in property <[Strip]> strip;
+    in-out property <bool> info-open: false;
+    in property <string> info-title;
+    in property <[InfoRow]> info-rows;
+    in property <string> hist-luma;
+    in property <string> hist-r;
+    in property <string> hist-g;
+    in property <string> hist-b;
+    in property <bool> slideshow: false;
+    in property <int> slide-fade-rev: 0;
+    in property <string> zoom-text: "100%";
+
+    // ---- editor ----
+    in property <image> ed-image;
+    in property <int> ed-w: 0;
+    in property <int> ed-h: 0;
+    in property <bool> ed-busy: false;
+    in property <string> ed-title;
+    in-out property <int> ed-tab: 0;
+    in property <[float]> ed-adj;
+    in-out property <float> ed-angle: 0;
+    in-out property <float> ed-cx: 0;
+    in-out property <float> ed-cy: 0;
+    in-out property <float> ed-cw: 1;
+    in-out property <float> ed-ch: 1;
+    in-out property <int> ed-aspect: 0;
+    in property <float> ed-aspect-ratio: 0;
+    in property <[FilterItem]> ed-filters;
+    in-out property <string> ed-filter: "none";
+    in-out property <float> ed-filter-amt: 100;
+    in-out property <int> ed-tool: 0;
+    in-out property <color> ed-color: #ff3b30;
+    in-out property <float> ed-width: 6;
+    in-out property <bool> ed-fill: false;
+    in-out property <string> ed-text: "";
+    in-out property <float> ed-text-size: 6;
+    in-out property <bool> ed-bold: true;
+    in-out property <bool> ed-italic: false;
+    in-out property <bool> ed-text-bg: false;
+    in property <bool> ed-text-selected: false;
+    in property <[LayerItem]> ed-layers;
+    in-out property <int> ed-sel-layer: -1;
+    in property <bool> ed-can-undo: false;
+    in property <bool> ed-can-redo: false;
+    in property <bool> ed-dirty: false;
+    in-out property <int> ed-fmt: 1;
+    in-out property <int> ed-quality: 92;
+    in property <string> ed-size-text;
+
+    // ---- settings ----
+    in-out property <bool> settings-open: false;
+    in-out property <int> set-theme: 0;
+    in-out property <int> set-accent-index: 0;
+    in-out property <color> set-accent: #0078d4;
+    in-out property <int> set-material: 1;
+    in-out property <int> set-font-size: 1;
+    in-out property <int> set-lang: 0;
+    in-out property <bool> set-auto-load: true;
+    in-out property <string> set-library-path;
+    in-out property <bool> set-confirm-delete: true;
+    in-out property <bool> set-keep-exif: true;
+    in-out property <int> set-quality: 95;
+    in-out property <bool> set-reduce-motion: false;
+    in-out property <int> set-window-mode: 0;
+    in-out property <int> set-slide-interval: 4;
+    in-out property <int> set-slide-transition: 0;
+    in-out property <bool> set-slide-shuffle: false;
+    in-out property <bool> set-slide-loop: true;
+    in property <[color]> swatches;
+    in property <bool> material-ok: true;
+    in property <string> app-version: "3.0.0";
+    in-out property <bool> about-open: false;
+
+    // ---- dialogs ----
+    in-out property <bool> confirm-open: false;
+    in property <string> confirm-title;
+    in property <string> confirm-desc;
+    in property <string> confirm-yes;
+    in property <bool> confirm-danger: true;
+    in-out property <bool> prompt-open: false;
+    in property <string> prompt-title;
+    in property <string> prompt-label;
+    in property <string> prompt-yes;
+    in-out property <string> prompt-value;
+    in-out property <bool> batch-open: false;
+    in-out property <string> batch-pattern: "Photo_{n}";
+    in-out property <int> batch-start: 1;
+    in-out property <int> batch-digits: 3;
+    in property <[string]> batch-preview;
+    in property <string> batch-apply-text;
+    in-out property <bool> dup-open: false;
+    in property <bool> dup-scanning: false;
+    in property <string> dup-summary;
+    in property <[DupGroup]> dup-groups;
+    in property <string> dup-trash-text;
+    in-out property <bool> album-pick-open: false;
+
+    // ---- toast ----
+    in property <bool> toast-visible: false;
+    in property <string> toast-text;
+    in property <string> toast-action;
+    in property <int> toast-kind: 0;     // 0 info, 1 success, 2 warning, 3 error
+
+    // ---- Rust implements these ----
+    callback act(string, int);            // every button and menu item: action name + an index
+    callback set(string, string);         // a setting changed: key + value
+    callback need-thumb(int);
+    callback need-strip-thumb(int);
+    callback grid-resized(length);
+    callback search-edited(string);
+    callback confirm-result(bool);
+    callback prompt-result(bool, string);
+    callback batch-changed();
+    callback dup-toggle(int, int);
+    callback pick-album(string);
+    callback dropped();
+    callback ed-adj-changed(int, float);
+    callback ed-adj-commit();
+    callback ed-angle-changed(float);
+    callback ed-crop-changed(float, float, float, float);
+    callback ed-commit();
+    callback ed-canvas(int, float, float);   // 0 down, 1 move, 2 up
+    callback ed-text-edited(string);
+    callback ed-style-changed();
+    pure callback hist-open(bool) -> bool;
+}

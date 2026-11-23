@@ -1,0 +1,267 @@
+import { Theme, Tr } from "theme.slint";
+import { App } from "state.slint";
+import { Icon, IconBtn, Btn, FSlider, FSwitch, Chip, Segmented, FTextBox } from "widgets.slint";
+
+// Crop box drawn over the picture. All values are 0..1 of the picture.
+component CropOverlay inherits Rectangle {
+    in property <length> dw;
+    in property <length> dh;
+    property <int> mode: 0;      // 1 left, 2 right, 4 top, 8 bottom, 16 move
+    property <float> sx; property <float> sy; property <float> sw; property <float> sh;
+    property <length> px; property <length> py;
+    property <float> nx; property <float> ny; property <float> nw; property <float> nh;
+    property <int> hm;
+    function hit(mx: length, my: length) -> int {
+        let e = 16px;
+        let l = App.ed-cx * dw; let r = (App.ed-cx + App.ed-cw) * dw;
+        let t = App.ed-cy * dh; let b = (App.ed-cy + App.ed-ch) * dh;
+        hm = 0;
+        if (mx > l - e && mx < r + e && my > t - e && my < b + e) {
+            if (abs(mx - l) < e) { hm = hm + 1; }
+            if (abs(mx - r) < e) { hm = hm + 2; }
+            if (abs(my - t) < e) { hm = hm + 4; }
+            if (abs(my - b) < e) { hm = hm + 8; }
+            if (hm == 0 && mx > l && mx < r && my > t && my < b) { hm = 16; }
+        }
+        return hm;
+    }
+    function apply(dx: float, dy: float) {
+        nx = sx; ny = sy; nw = sw; nh = sh;
+        let minv = 0.03;
+        if (mode == 16) {
+            nx = clamp(sx + dx, 0, 1 - sw); ny = clamp(sy + dy, 0, 1 - sh);
+        } else {
+            if (mod(floor(mode / 1), 2) == 1) { nx = clamp(sx + dx, 0, sx + sw - minv); nw = sx + sw - nx; }
+            if (mod(floor(mode / 2), 2) == 1) { nw = clamp(sw + dx, minv, 1 - sx); }
+            if (mod(floor(mode / 4), 2) == 1) { ny = clamp(sy + dy, 0, sy + sh - minv); nh = sy + sh - ny; }
+            if (mod(floor(mode / 8), 2) == 1) { nh = clamp(sh + dy, minv, 1 - sy); }
+            if (App.ed-aspect-ratio > 0) {
+                let r = App.ed-aspect-ratio * App.ed-h / max(1, App.ed-w);
+                if (mod(mode, 4) != 0) { nh = nw / r; } else { nw = nh * r; }
+                if (nh > 1 - ny) { nh = 1 - ny; nw = nh * r; }
+                if (nw > 1 - nx) { nw = 1 - nx; nh = nw / r; }
+                if (mod(floor(mode / 4), 2) == 1) { ny = sy + sh - nh; }
+                if (mod(floor(mode / 1), 2) == 1) { nx = sx + sw - nw; }
+            }
+        }
+        App.ed-crop-changed(nx, ny, nw, nh);
+    }
+    // dimmed outside
+    Rectangle { x: 0px; y: 0px; width: parent.width; height: App.ed-cy * dh; background: #00000099; }
+    Rectangle { x: 0px; y: (App.ed-cy + App.ed-ch) * dh; width: parent.width; height: parent.height - self.y; background: #00000099; }
+    Rectangle { x: 0px; y: App.ed-cy * dh; width: App.ed-cx * dw; height: App.ed-ch * dh; background: #00000099; }
+    Rectangle { x: (App.ed-cx + App.ed-cw) * dw; y: App.ed-cy * dh; width: parent.width - self.x; height: App.ed-ch * dh; background: #00000099; }
+    Rectangle { x: App.ed-cx * dw; y: App.ed-cy * dh; width: App.ed-cw * dw; height: App.ed-ch * dh; border-width: 1.5px; border-color: #ffffff; background: transparent;
+        // rule of thirds
+        Rectangle { x: parent.width / 3; width: 1px; height: parent.height; background: #ffffff55; }
+        Rectangle { x: parent.width * 2 / 3; width: 1px; height: parent.height; background: #ffffff55; }
+        Rectangle { y: parent.height / 3; height: 1px; width: parent.width; background: #ffffff55; }
+        Rectangle { y: parent.height * 2 / 3; height: 1px; width: parent.width; background: #ffffff55; }
+    }
+    for hx[i] in [0.0, 0.5, 1.0, 0.0, 1.0, 0.0, 0.5, 1.0] : Rectangle {
+        property <float> hy: [0.0, 0.0, 0.0, 0.5, 0.5, 1.0, 1.0, 1.0][i];
+        x: (App.ed-cx + App.ed-cw * hx) * dw - 6px; y: (App.ed-cy + App.ed-ch * hy) * dh - 6px; width: 12px; height: 12px; border-radius: 3px;
+        background: #ffffff; border-width: 1px; border-color: #00000066;
+    }
+    ta := TouchArea {
+        mouse-cursor: self.pressed ? MouseCursor.move : MouseCursor.crosshair;
+        pointer-event(e) => {
+            if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                root.mode = root.hit(self.mouse-x, self.mouse-y);
+                root.sx = App.ed-cx; root.sy = App.ed-cy; root.sw = App.ed-cw; root.sh = App.ed-ch;
+                root.px = self.mouse-x; root.py = self.mouse-y;
+            }
+            if (e.button == PointerEventButton.left && e.kind == PointerEventKind.up) { if (root.mode != 0) { App.ed-commit(); } root.mode = 0; }
+        }
+        moved => { if (self.pressed && root.mode != 0) { root.apply((self.mouse-x - root.px) / root.dw, (self.mouse-y - root.py) / root.dh); } }
+    }
+}
+
+component PanelTitle inherits Text { color: Theme.text; font-size: 14px * Theme.scale; font-weight: 600; }
+
+component ToolButton inherits Rectangle {
+    in property <image> glyph;
+    in property <string> tip;
+    in property <bool> on;
+    callback clicked();
+    width: 32px; height: 32px; border-radius: 5px;
+    border-width: on ? 1px : 0px; border-color: Theme.accent;
+    background: on ? Theme.accent.with-alpha(0.15) : ta.has-hover ? Theme.subtle-hover : transparent;
+    Icon { glyph: root.glyph; size: 18px; tint: on ? Theme.accent-text : Theme.text; }
+    ta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+export component EditorView inherits Rectangle {
+    background: Theme.viewer-bg;
+    property <length> aw: canvas.width;
+    property <length> ah: canvas.height;
+    property <float> fit: min(aw / max(1px, App.ed-w * 1px), ah / max(1px, App.ed-h * 1px));
+    property <length> dw: App.ed-w * 1px * fit;
+    property <length> dh: App.ed-h * 1px * fit;
+    property <[string]> adj-keys: ["brightness", "contrast", "saturation", "warmth", "tint", "highlights", "shadows", "sharpness", "vignette", "hue", "blur"];
+    property <[float]> adj-min: [-100, -100, -100, -100, -100, -100, -100, 0, -100, -180, 0];
+    property <[float]> adj-max: [100, 100, 100, 100, 100, 100, 100, 100, 100, 180, 100];
+
+    HorizontalLayout {
+        VerticalLayout {
+            horizontal-stretch: 1;
+            Rectangle {
+                height: 48px; background: Theme.layer;
+                HorizontalLayout { padding-left: 8px; padding-right: 8px; spacing: 4px;
+                    IconBtn { y: 8px; glyph: @image-url("icons/chevron-left.svg"); tip: Tr.t("back"); clicked => { App.act("ed-back", 0); } }
+                    Text { text: App.ed-title; color: Theme.text; font-size: Theme.fs; font-weight: 600; vertical-alignment: center; overflow: elide; }
+                    Text { text: App.ed-dirty ? "• " + Tr.t("ed.edited") : ""; color: Theme.text-3; font-size: Theme.fs-small; vertical-alignment: center; }
+                    Rectangle { horizontal-stretch: 1; }
+                    IconBtn { y: 8px; glyph: @image-url("icons/undo-2.svg"); tip: Tr.t("undo"); enabled: App.ed-can-undo; clicked => { App.act("ed-undo", 0); } }
+                    IconBtn { y: 8px; glyph: @image-url("icons/redo-2.svg"); tip: Tr.t("redo"); enabled: App.ed-can-redo; clicked => { App.act("ed-redo", 0); } }
+                    Rectangle { width: 36px; height: 32px; y: 8px; border-radius: 4px; background: cmp.pressed ? Theme.subtle-press : cmp.has-hover ? Theme.subtle-hover : transparent;
+                        Icon { glyph: @image-url("icons/scan.svg"); size: 18px; }
+                        cmp := TouchArea { mouse-cursor: pointer;
+                            pointer-event(e) => {
+                                if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) { App.act("ed-compare", 1); }
+                                if (e.button == PointerEventButton.left && e.kind == PointerEventKind.up) { App.act("ed-compare", 0); }
+                            } } }
+                    IconBtn { y: 8px; glyph: @image-url("icons/refresh-cw.svg"); tip: Tr.t("ed.resetAll"); clicked => { App.act("ed-reset", 0); } }
+                }
+            }
+            canvas := Rectangle {
+                vertical-stretch: 1; clip: true;
+                if App.ed-w > 0 : Rectangle {
+                    x: (parent.width - root.dw) / 2; y: (parent.height - root.dh) / 2; width: root.dw; height: root.dh;
+                    Image { source: App.ed-image; width: parent.width; height: parent.height; }
+                    if App.ed-tab == 0 : CropOverlay { dw: root.dw; dh: root.dh; }
+                    if App.ed-tab == 3 && App.ed-tool != 0 : TouchArea {
+                        mouse-cursor: MouseCursor.crosshair;
+                        pointer-event(e) => {
+                            if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) { App.ed-canvas(0, self.mouse-x / root.dw, self.mouse-y / root.dh); }
+                            if (e.button == PointerEventButton.left && e.kind == PointerEventKind.up) { App.ed-canvas(2, self.mouse-x / root.dw, self.mouse-y / root.dh); }
+                        }
+                        moved => { if (self.pressed) { App.ed-canvas(1, self.mouse-x / root.dw, self.mouse-y / root.dh); } }
+                    }
+                }
+                if App.ed-w == 0 : Text { text: Tr.t("ed.loading"); color: Theme.text-2; font-size: Theme.fs; horizontal-alignment: center; vertical-alignment: center; }
+            }
+        }
+        // ---- side panel
+        Rectangle {
+            width: 330px; background: Theme.layer;
+            Rectangle { x: 0px; width: 1px; height: parent.height; background: Theme.stroke; }
+            VerticalLayout {
+                // tabs
+                Rectangle { height: 48px;
+                    HorizontalLayout { padding: 6px; spacing: 4px;
+                        for t[i] in [{ g: @image-url("icons/crop.svg"), k: "ed.crop" }, { g: @image-url("icons/sliders-horizontal.svg"), k: "ed.adjust" }, { g: @image-url("icons/wand-sparkles.svg"), k: "ed.filters" }, { g: @image-url("icons/brush.svg"), k: "ed.draw" }] : Rectangle {
+                            horizontal-stretch: 1; border-radius: 5px; background: App.ed-tab == i ? Theme.subtle-hover : tt.has-hover ? Theme.subtle-hover : transparent;
+                            Rectangle { y: parent.height - 3px; height: 3px; width: 20px; x: (parent.width - 20px) / 2; border-radius: 1.5px; background: App.ed-tab == i ? Theme.accent : transparent; }
+                            HorizontalLayout { alignment: center; spacing: 6px; x: 0px; y: 0px; width: parent.width; height: parent.height;
+                                Icon { glyph: t.g; size: 16px; tint: App.ed-tab == i ? Theme.accent-text : Theme.text; }
+                                Text { text: Tr.t(t.k); color: Theme.text; font-size: Theme.fs-small; vertical-alignment: center; } }
+                            tt := TouchArea { mouse-cursor: pointer; clicked => { App.act("ed-tab", i); } }
+                        }
+                    }
+                }
+                Flickable {
+                    vertical-stretch: 1;
+                    content-height: pc.preferred-height + 16px;
+                    pc := VerticalLayout { padding: 14px; spacing: 10px;
+                        // ---------------- crop
+                        if App.ed-tab == 0 : VerticalLayout { spacing: 10px;
+                            PanelTitle { text: Tr.t("ed.rotate"); }
+                            HorizontalLayout { spacing: 6px; alignment: start;
+                                Btn { glyph: @image-url("icons/rotate-ccw.svg"); text: ""; clicked => { App.act("ed-rot", 3); } }
+                                Btn { glyph: @image-url("icons/rotate-cw.svg"); text: ""; clicked => { App.act("ed-rot", 1); } }
+                                Btn { glyph: @image-url("icons/flip-horizontal-2.svg"); text: ""; clicked => { App.act("ed-flip", 0); } }
+                                Btn { glyph: @image-url("icons/flip-vertical-2.svg"); text: ""; clicked => { App.act("ed-flip", 1); } }
+                            }
+                            HorizontalLayout { PanelTitle { text: Tr.t("ed.straighten"); horizontal-stretch: 1; } Text { text: round(App.ed-angle * 10) / 10 + "°"; color: Theme.text-2; font-size: Theme.fs-small; } }
+                            FSlider { minimum: -45; maximum: 45; step: 0.5; value: App.ed-angle; changed(v) => { App.ed-angle-changed(v); } released(v) => { App.ed-commit(); } }
+                            PanelTitle { text: Tr.t("ed.crop"); }
+                            Rectangle { height: 74px;
+                                for c[i] in ["ed.aspect.free", "ed.aspect.orig", "1:1", "4:3", "3:2", "16:9", "9:16"] : Chip {
+                                    x: [0px, 72px, 172px, 224px, 0px, 52px, 108px][i]; y: i < 4 ? 0px : 38px; width: [66px, 94px, 46px, 46px, 46px, 52px, 52px][i];
+                                    text: i < 2 ? Tr.t(c) : c; active: App.ed-aspect == i; clicked => { App.act("ed-aspect", i); } } }
+                            Text { text: App.ed-size-text; color: Theme.text-3; font-size: Theme.fs-small; }
+                        }
+                        // ---------------- adjust
+                        if App.ed-tab == 1 : VerticalLayout { spacing: 8px;
+                            HorizontalLayout { spacing: 6px;
+                                Btn { text: Tr.t("adj.auto"); glyph: @image-url("icons/sparkles.svg"); accent: true; clicked => { App.act("ed-auto", 0); } }
+                                Btn { text: Tr.t("reset"); clicked => { App.act("ed-adj-reset", 0); } } }
+                            for k[i] in root.adj-keys : VerticalLayout { spacing: 0px;
+                                HorizontalLayout { Text { text: Tr.t("adj." + k); color: Theme.text; font-size: Theme.fs; horizontal-stretch: 1; }
+                                    Text { text: App.ed-adj.length > i ? round(App.ed-adj[i]) : 0; color: Theme.text-2; font-size: Theme.fs-small; } }
+                                FSlider { minimum: root.adj-min[i]; maximum: root.adj-max[i]; value: App.ed-adj.length > i ? App.ed-adj[i] : 0; changed(v) => { App.ed-adj-changed(i, v); } released(v) => { App.ed-adj-commit(); } }
+                            }
+                        }
+                        // ---------------- filters
+                        if App.ed-tab == 2 : VerticalLayout { spacing: 10px;
+                            Rectangle { height: ceil(App.ed-filters.length / 3) * 118px;
+                                for f[i] in App.ed-filters : Rectangle {
+                                    x: mod(i, 3) * 102px; y: floor(i / 3) * 118px; width: 96px; height: 112px;
+                                    Rectangle { width: 96px; height: 96px; border-radius: 6px; clip: true; background: Theme.subtle-hover;
+                                        border-width: App.ed-filter == f.id ? 2px : 0px; border-color: Theme.accent;
+                                        Image { source: f.thumb; width: parent.width; height: parent.height; image-fit: cover; } }
+                                    Text { y: 100px; width: 96px; text: f.label; color: App.ed-filter == f.id ? Theme.accent-text : Theme.text; font-size: Theme.fs-small; horizontal-alignment: center; overflow: elide; }
+                                    TouchArea { mouse-cursor: pointer; clicked => { App.act("ed-filter", i); } }
+                                } }
+                            if App.ed-filter != "none" : VerticalLayout { spacing: 2px;
+                                HorizontalLayout { Text { text: Tr.t("ed.opacity"); color: Theme.text; font-size: Theme.fs; horizontal-stretch: 1; } Text { text: round(App.ed-filter-amt) + "%"; color: Theme.text-2; font-size: Theme.fs-small; } }
+                                FSlider { minimum: 0; maximum: 100; value: App.ed-filter-amt; changed(v) => { App.act("ed-filter-amt", round(v)); } released(v) => { App.ed-commit(); } } }
+                        }
+                        // ---------------- draw
+                        if App.ed-tab == 3 : VerticalLayout { spacing: 10px;
+                            PanelTitle { text: Tr.t("ed.tool"); }
+                            Rectangle { height: 38px;
+                                for g[i] in [@image-url("icons/brush.svg"), @image-url("icons/highlighter.svg"), @image-url("icons/minus.svg"), @image-url("icons/move-up-right.svg"), @image-url("icons/square.svg"), @image-url("icons/circle.svg"), @image-url("icons/type.svg"), @image-url("icons/grid-3x3.svg"), @image-url("icons/droplet.svg")] : ToolButton {
+                                    x: i * 33px; y: 0px; glyph: g; on: App.ed-tool == i + 1;
+                                    clicked => { App.act("ed-tool", i + 1); } } }
+                            if App.ed-tool >= 1 && App.ed-tool <= 6 : VerticalLayout { spacing: 8px;
+                                PanelTitle { text: Tr.t("draw.color"); }
+                                Rectangle { height: 34px; for c[i] in [#ff3b30, #ff9500, #ffcc00, #34c759, #00c7be, #0a84ff, #bf5af2, #ffffff, #000000] : Rectangle {
+                                    x: i * 33px; width: 28px; height: 28px; border-radius: 14px; background: c; border-width: App.ed-color == c ? 2px : 1px; border-color: App.ed-color == c ? Theme.text : Theme.stroke-strong;
+                                    TouchArea { mouse-cursor: pointer; clicked => { App.ed-color = c; App.ed-style-changed(); } } } }
+                                HorizontalLayout { Text { text: Tr.t("draw.width"); color: Theme.text; font-size: Theme.fs; horizontal-stretch: 1; } Text { text: round(App.ed-width); color: Theme.text-2; font-size: Theme.fs-small; } }
+                                FSlider { minimum: 1; maximum: 40; value: App.ed-width; changed(v) => { App.ed-width = v; App.ed-style-changed(); } }
+                                if App.ed-tool >= 5 : HorizontalLayout { Text { text: Tr.t("draw.fill"); color: Theme.text; font-size: Theme.fs; horizontal-stretch: 1; } FSwitch { checked: App.ed-fill; toggled(c) => { App.ed-fill = c; App.ed-style-changed(); } } }
+                            }
+                            if App.ed-tool == 7 : VerticalLayout { spacing: 8px;
+                                PanelTitle { text: App.ed-text-selected ? Tr.t("text.edit") : Tr.t("text.add"); }
+                                if !App.ed-text-selected : Text { text: Tr.t("text.default"); color: Theme.text-3; font-size: Theme.fs-small; }
+                                FTextBox { text: App.ed-text; placeholder: Tr.t("text.placeholder"); edited(t) => { App.ed-text-edited(t); } }
+                                HorizontalLayout { Text { text: Tr.t("text.size"); color: Theme.text; font-size: Theme.fs; horizontal-stretch: 1; } Text { text: round(App.ed-text-size); color: Theme.text-2; font-size: Theme.fs-small; } }
+                                FSlider { minimum: 2; maximum: 20; value: App.ed-text-size; changed(v) => { App.ed-text-size = v; App.ed-style-changed(); } }
+                                Rectangle { height: 34px; for c[i] in [#ffffff, #000000, #ff3b30, #ffcc00, #34c759, #0a84ff, #bf5af2] : Rectangle {
+                                    x: i * 33px; width: 28px; height: 28px; border-radius: 14px; background: c; border-width: App.ed-color == c ? 2px : 1px; border-color: App.ed-color == c ? Theme.text : Theme.stroke-strong;
+                                    TouchArea { mouse-cursor: pointer; clicked => { App.ed-color = c; App.ed-style-changed(); } } } }
+                                HorizontalLayout { spacing: 6px;
+                                    Chip { text: Tr.t("text.bold"); active: App.ed-bold; clicked => { App.ed-bold = !App.ed-bold; App.ed-style-changed(); } }
+                                    Chip { text: Tr.t("text.italic"); active: App.ed-italic; clicked => { App.ed-italic = !App.ed-italic; App.ed-style-changed(); } }
+                                    Chip { text: Tr.t("text.bg"); active: App.ed-text-bg; clicked => { App.ed-text-bg = !App.ed-text-bg; App.ed-style-changed(); } } }
+                            }
+                            if App.ed-layers.length > 0 : VerticalLayout { spacing: 4px;
+                                PanelTitle { text: Tr.t("ed.layers"); }
+                                for l[i] in App.ed-layers : Rectangle { height: 34px; border-radius: 4px; background: App.ed-sel-layer == l.id ? Theme.accent.with-alpha(0.15) : la.has-hover ? Theme.subtle-hover : transparent;
+                                    HorizontalLayout { padding-left: 10px; spacing: 6px;
+                                        Text { text: l.label; color: Theme.text; font-size: Theme.fs; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                                        IconBtn { glyph: @image-url("icons/trash-2.svg"); size: 30px; icon-size: 15px; y: 2px; tip: Tr.t("ed.deleteItem"); clicked => { App.act("ed-layer-delete", l.id); } } }
+                                    la := TouchArea { width: parent.width - 36px; mouse-cursor: pointer; clicked => { App.act("ed-layer-select", l.id); } } } }
+                        }
+                    }
+                }
+                // ---- save
+                Rectangle { height: 1px; background: Theme.stroke; }
+                VerticalLayout { padding: 14px; spacing: 8px;
+                    HorizontalLayout { spacing: 8px;
+                        Text { text: Tr.t("exp.format"); color: Theme.text-2; font-size: Theme.fs; vertical-alignment: center; }
+                        Segmented { items: ["PNG", "JPEG", "WebP"]; index: App.ed-fmt; picked(i) => { App.ed-fmt = i; } } }
+                    if App.ed-fmt == 1 : HorizontalLayout { spacing: 8px;
+                        Text { text: Tr.t("exp.quality") + " " + App.ed-quality; color: Theme.text-2; font-size: Theme.fs; vertical-alignment: center; width: 90px; }
+                        FSlider { minimum: 50; maximum: 100; value: App.ed-quality; changed(v) => { App.ed-quality = round(v); } } }
+                    HorizontalLayout { spacing: 8px;
+                        Btn { text: Tr.t("exp.saveCopy"); glyph: @image-url("icons/copy.svg"); horizontal-stretch: 1; enabled: App.ed-dirty; clicked => { App.act("ed-save-copy", 0); } }
+                        Btn { text: Tr.t("save"); glyph: @image-url("icons/save.svg"); accent: true; horizontal-stretch: 1; enabled: App.ed-dirty; clicked => { App.act("ed-save", 0); } } }
+                }
+            }
+        }
+    }
+}

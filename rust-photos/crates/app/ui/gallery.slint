@@ -1,0 +1,188 @@
+import { ListView } from "std-widgets.slint";
+import { Theme, Tr } from "theme.slint";
+import { App } from "state.slint";
+import { Tile, Row } from "types.slint";
+import { Icon, IconBtn, Btn, FSlider, FSwitch, Dropdown, Skeleton, FTextBox } from "widgets.slint";
+
+component TileView inherits Rectangle {
+    in property <Tile> tile;
+    property <bool> hovered: ta.has-hover || fav-ta.has-hover || chk-ta.has-hover;
+    property <bool> ctrl;
+    clip: true;
+    border-radius: 6px;
+    background: Theme.subtle-hover;
+    border-width: tile.selected ? 2px : 0px;
+    border-color: Theme.accent;
+    init => { if (!tile.loaded) { App.need-thumb(tile.idx); } }
+
+    if tile.loaded : Image {
+        source: tile.thumb;
+        width: parent.width; height: parent.height;
+        image-fit: cover;
+        opacity: 1;
+        animate opacity { duration: Theme.t-med; }
+    }
+    if !tile.loaded : Skeleton { width: parent.width; height: parent.height; }
+
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        pointer-event(e) => {
+            if (e.kind == PointerEventKind.down) { root.ctrl = e.modifiers.control || e.modifiers.shift; }
+        }
+        clicked => { App.act(root.ctrl ? "toggle" : "open", tile.idx); }
+        double-clicked => { App.act("open", tile.idx); }
+    }
+
+    // caption on hover
+    Rectangle {
+        y: parent.height - self.height; height: 28px; opacity: root.hovered ? 1 : 0;
+        background: @linear-gradient(180deg, #00000000 0%, #000000aa 100%);
+        animate opacity { duration: Theme.t-fast; }
+        Text { x: 8px; width: parent.width - 16px; y: 6px; text: tile.name; color: #ffffff; font-size: Theme.fs-small; overflow: elide; }
+    }
+    // select check
+    Rectangle {
+        x: 6px; y: 6px; width: 22px; height: 22px; border-radius: 11px;
+        visible: root.hovered || App.selecting || tile.selected;
+        background: tile.selected ? Theme.accent : #00000066;
+        border-width: 1.5px; border-color: #ffffff;
+        if tile.selected : Icon { glyph: @image-url("icons/check.svg"); size: 14px; tint: Theme.on-accent; x: 3px; y: 3px; }
+        chk-ta := TouchArea { mouse-cursor: pointer; clicked => { App.act("toggle", tile.idx); } }
+    }
+    // favorite heart
+    Rectangle {
+        x: parent.width - 32px; y: 6px; width: 26px; height: 26px; border-radius: 13px;
+        visible: root.hovered || tile.fav;
+        background: root.hovered ? #00000066 : transparent;
+        Icon { glyph: @image-url("icons/heart.svg"); size: 16px; tint: tile.fav ? #ff5b7a : #ffffff; x: 5px; y: 5px; }
+        fav-ta := TouchArea { mouse-cursor: pointer; clicked => { App.act("fav", tile.idx); } }
+    }
+    ContextMenuArea {
+        Menu {
+            MenuItem { title: Tr.t("act.open"); activated => { App.act("open", tile.idx); } }
+            MenuItem { title: Tr.t("act.edit"); activated => { App.act("edit", tile.idx); } }
+            MenuItem { title: tile.fav ? Tr.t("fav.remove") : Tr.t("fav.add"); activated => { App.act("fav", tile.idx); } }
+            MenuItem { title: Tr.t("alb.addTo"); activated => { App.act("album", tile.idx); } }
+            MenuSeparator {}
+            MenuItem { title: Tr.t("gal.selectMode"); activated => { App.act("toggle", tile.idx); } }
+            MenuItem { title: Tr.t("act.copyImage"); activated => { App.act("copy-image", tile.idx); } }
+            MenuItem { title: Tr.t("act.copyPath"); activated => { App.act("copy-path", tile.idx); } }
+            MenuItem { title: Tr.t("act.reveal"); activated => { App.act("reveal", tile.idx); } }
+            MenuItem { title: Tr.t("act.wallpaper"); activated => { App.act("wallpaper", tile.idx); } }
+            MenuSeparator {}
+            MenuItem { title: Tr.t("rename"); activated => { App.act("rename", tile.idx); } }
+            MenuItem { title: Tr.t("act.copyTo"); activated => { App.act("copy-to", tile.idx); } }
+            MenuItem { title: Tr.t("act.moveTo"); activated => { App.act("move-to", tile.idx); } }
+            MenuSeparator {}
+            MenuItem { title: Tr.t("delete"); activated => { App.act("delete", tile.idx); } }
+        }
+    }
+}
+
+component GridRow inherits Rectangle {
+    in property <Row> data;
+    height: data.head ? 44px : App.tile-w + 6px;
+    if data.head : HorizontalLayout {
+        padding-left: 18px; padding-top: 14px; spacing: 8px; alignment: start;
+        Text { text: data.title; color: Theme.text; font-size: 15px * Theme.scale; font-weight: 600; vertical-alignment: center; }
+        Text { text: data.count; color: Theme.text-3; font-size: Theme.fs-small; vertical-alignment: center; }
+    }
+    if !data.head : HorizontalLayout {
+        padding-left: 18px; padding-right: 18px; spacing: 6px; alignment: start;
+        for tile in data.tiles : TileView { tile: tile; width: App.tile-w; height: App.tile-w; }
+    }
+}
+
+export component GalleryView inherits Rectangle {
+    VerticalLayout {
+        // title row
+        Rectangle {
+            height: 56px;
+            HorizontalLayout {
+                padding-left: 18px; padding-right: 14px; spacing: 10px;
+                Text { text: App.scope-title; font-size: Theme.fs-title; font-weight: 600; color: Theme.text; vertical-alignment: center; }
+                Text { text: App.count-text; font-size: Theme.fs; color: Theme.text-3; vertical-alignment: center; }
+                Rectangle { horizontal-stretch: 1; }
+                if App.scope == 0 || App.scope == 1 || App.scope == 3 : FTextBox {
+                    width: 220px; y: 12px;
+                    placeholder: Tr.t("gal.search");
+                    text: App.search;
+                    edited(t) => { App.search-edited(t); }
+                }
+                if App.scope == 0 : Btn { text: Tr.t("gal.openFolder"); glyph: @image-url("icons/folder-open.svg"); y: 12px; accent: true; clicked => { App.act("open-folder", 0); } }
+                if App.scope == 0 : IconBtn { glyph: @image-url("icons/images.svg"); y: 12px; tip: Tr.t("gal.openFiles"); clicked => { App.act("open-files", 0); } }
+                if App.scope == 2 : Btn { text: Tr.t("alb.new"); glyph: @image-url("icons/plus.svg"); y: 12px; accent: true; clicked => { App.act("album-new", 0); } }
+                if App.scope != 2 : IconBtn { glyph: @image-url("icons/list-checks.svg"); y: 12px; active: App.selecting; tip: Tr.t("gal.selectMode"); clicked => { App.act("select-mode", 0); } }
+                IconBtn { glyph: @image-url("icons/refresh-cw.svg"); y: 12px; tip: Tr.t("gal.refresh"); clicked => { App.act("refresh", 0); } }
+            }
+        }
+        // selection bar or filters
+        if App.selecting && App.scope != 2 : Rectangle {
+            height: 44px; background: Theme.subtle-hover; border-radius: 6px;
+            HorizontalLayout { padding-left: 14px; padding-right: 10px; spacing: 6px;
+                Text { text: App.sel-text; color: Theme.text; font-size: Theme.fs; vertical-alignment: center; font-weight: 600; }
+                Rectangle { horizontal-stretch: 1; }
+                IconBtn { glyph: @image-url("icons/check.svg"); y: 6px; tip: Tr.t("gal.selectAll"); clicked => { App.act("select-all", 0); } }
+                IconBtn { glyph: @image-url("icons/heart.svg"); y: 6px; tip: Tr.t("fav.add"); clicked => { App.act("sel-fav", 0); } }
+                IconBtn { glyph: @image-url("icons/folder-heart.svg"); y: 6px; tip: Tr.t("alb.addTo"); clicked => { App.act("sel-album", 0); } }
+                IconBtn { glyph: @image-url("icons/folder-input.svg"); y: 6px; tip: Tr.t("act.copyTo"); clicked => { App.act("sel-copy", 0); } }
+                IconBtn { glyph: @image-url("icons/folder-output.svg"); y: 6px; tip: Tr.t("act.moveTo"); clicked => { App.act("sel-move", 0); } }
+                IconBtn { glyph: @image-url("icons/pencil.svg"); y: 6px; tip: Tr.t("act.batchRename"); clicked => { App.act("sel-rename", 0); } }
+                IconBtn { glyph: @image-url("icons/trash-2.svg"); y: 6px; tint: Theme.danger; tip: Tr.t("delete"); clicked => { App.act("sel-delete", 0); } }
+                IconBtn { glyph: @image-url("icons/x.svg"); y: 6px; tip: Tr.t("gal.clearSel"); clicked => { App.act("select-mode", 0); } }
+            }
+        }
+        if !(App.selecting && App.scope != 2) && App.scope != 2 : Rectangle {
+            height: 44px;
+            HorizontalLayout {
+                padding-left: 18px; padding-right: 14px; spacing: 8px;
+                Dropdown { y: 6px; width: 170px; items: App.folder-items; index: App.folder-index; label: Tr.t("gal.folder"); picked(i) => { App.folder-index = i; App.act("filter", 0); } }
+                Dropdown { y: 6px; width: 140px; items: App.format-items; index: App.format-index; label: Tr.t("gal.format"); picked(i) => { App.format-index = i; App.act("filter", 0); } }
+                Dropdown { y: 6px; width: 160px; items: App.sort-items; index: App.sort-index; label: Tr.t("gal.sort"); picked(i) => { App.sort-index = i; App.set("sort", i); } }
+                Rectangle { horizontal-stretch: 1; }
+                Icon { glyph: @image-url("icons/grid-3x3.svg"); size: 16px; tint: Theme.text-2; y: 14px; }
+                FSlider { y: 10px; width: 120px; minimum: 110; maximum: 320; step: 10; value: App.tile-size; changed(v) => { App.set("tile", v); } }
+                Text { text: Tr.t("gal.group"); color: Theme.text-2; font-size: Theme.fs-small; vertical-alignment: center; }
+                FSwitch { y: 12px; checked: App.group; toggled(c) => { App.set("group", c ? "1" : "0"); } }
+            }
+        }
+
+        // pictures
+        Rectangle {
+            vertical-stretch: 1;
+            if App.scope == 2 : Flickable {
+                content-height: albums-grid.preferred-height + 24px;
+                albums-grid := Rectangle {
+                    preferred-height: max(1, ceil(App.albums.length / 4)) * 230px + 20px;
+                    for a[i] in App.albums : Rectangle {
+                        x: 18px + mod(i, 4) * 232px; y: floor(i / 4) * 230px; width: 220px; height: 220px;
+                        border-radius: 8px; background: Theme.card; border-width: 1px; border-color: Theme.stroke; clip: true;
+                        if a.has-cover : Image { source: a.cover; width: parent.width; height: 170px; image-fit: cover; }
+                        if !a.has-cover : Rectangle { width: parent.width; height: 170px; background: Theme.subtle-hover;
+                            Icon { glyph: @image-url("icons/folder-heart.svg"); size: 40px; tint: Theme.text-3; x: (parent.width - 40px) / 2; y: 65px; } }
+                        Text { x: 12px; y: 178px; width: parent.width - 24px; text: a.name; color: Theme.text; font-size: Theme.fs; font-weight: 600; overflow: elide; }
+                        Text { x: 12px; y: 198px; width: parent.width - 24px; text: a.count; color: Theme.text-3; font-size: Theme.fs-small; }
+                        TouchArea { mouse-cursor: pointer; clicked => { App.act("album-open", i); } }
+                        ContextMenuArea { Menu {
+                            MenuItem { title: Tr.t("open"); activated => { App.act("album-open", i); } }
+                            MenuItem { title: Tr.t("alb.rename"); activated => { App.act("album-rename", i); } }
+                            MenuItem { title: Tr.t("alb.delete"); activated => { App.act("album-delete", i); } }
+                        } }
+                    }
+                }
+            }
+            if App.scope != 2 : ListView {
+                for r in App.rows : GridRow { data: r; }
+            }
+            // size tracking so Rust can lay out the columns
+            Rectangle { width: parent.width; height: 0px; changed width => { App.grid-resized(self.width); } init => { App.grid-resized(self.width); } }
+            if (App.rows.length == 0 && App.loaded && !App.loading && App.scope != 2) || (App.scope == 2 && App.albums.length == 0) : VerticalLayout {
+                alignment: center; spacing: 8px;
+                Icon { glyph: App.scope == 1 ? @image-url("icons/heart.svg") : App.scope == 2 ? @image-url("icons/folder-heart.svg") : @image-url("icons/images.svg"); size: 48px; tint: Theme.text-3; x: (parent.width - 48px) / 2; }
+                Text { text: App.empty-title; color: Theme.text; font-size: 18px * Theme.scale; font-weight: 600; horizontal-alignment: center; }
+                Text { text: App.empty-desc; color: Theme.text-2; font-size: Theme.fs; horizontal-alignment: center; wrap: word-wrap; }
+            }
+            if App.loading : Text { text: Tr.t("gal.scanning"); color: Theme.text-2; font-size: Theme.fs; horizontal-alignment: center; vertical-alignment: center; }
+        }
+    }
+}
