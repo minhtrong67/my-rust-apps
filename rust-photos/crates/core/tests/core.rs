@@ -207,3 +207,49 @@ fn settings_roundtrip_and_old_values_survive() {
     let back: store::Settings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
     assert_eq!(back, s);
 }
+
+fn jpeg_with_orientation(img: &image::RgbImage, orientation: u8) -> Vec<u8> {
+    let mut buf = Vec::new();
+    image::DynamicImage::ImageRgb8(img.clone()).write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Jpeg).unwrap();
+    let mut tiff: Vec<u8> = b"MM\0\x2A\0\0\0\x08".to_vec();
+    tiff.extend_from_slice(&[0, 1]);
+    tiff.extend_from_slice(&[0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, orientation, 0, 0]);
+    tiff.extend_from_slice(&[0, 0, 0, 0]);
+    let mut seg = vec![0xFF, 0xE1];
+    seg.extend_from_slice(&((2 + 6 + tiff.len()) as u16).to_be_bytes());
+    seg.extend_from_slice(b"Exif\0\0");
+    seg.extend_from_slice(&tiff);
+    let mut out = vec![0xFF, 0xD8];
+    out.extend_from_slice(&seg);
+    out.extend_from_slice(&buf[2..]);
+    out
+}
+
+#[test]
+fn scaled_jpeg_thumbnail_matches_a_full_decode() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("big.jpg");
+    // smooth picture with some texture, 2400 x 1600: the decoder will reduce it to 1/2 or 1/4 size
+    let img = image::RgbImage::from_fn(2400, 1600, |x, y| image::Rgb([(x / 10) as u8, (y / 7) as u8, (((x + y) / 14) % 256) as u8]));
+    std::fs::write(&p, jpeg_with_orientation(&img, 1)).unwrap();
+    let fast = thumbs::load_thumb(&dir.path().join("c"), &p, 128).unwrap();
+    let full = thumbs::fill_square(&fluent_decode(&p), 128);
+    let mut diff = 0u64;
+    for (a, b) in fast.pixels().zip(full.pixels()) { for c in 0..3 { diff += (a[c] as i64 - b[c] as i64).unsigned_abs(); } }
+    let mean = diff as f64 / (128.0 * 128.0 * 3.0);
+    assert!(mean < 3.0, "scaled decode drifted from the full decode: mean abs diff {mean}");
+}
+fn fluent_decode(p: &std::path::Path) -> RgbaImage { rust_photos_core::decode::open_upright(p).unwrap().to_rgba8() }
+
+#[test]
+fn scaled_jpeg_thumbnail_respects_exif_orientation() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("rot.jpg");
+    // left half red, right half blue, stored sideways with orientation 6 (rotate 90 clockwise): red ends up on top
+    let img = image::RgbImage::from_fn(1200, 600, |x, _| if x < 600 { image::Rgb([230, 20, 20]) } else { image::Rgb([20, 20, 230]) });
+    std::fs::write(&p, jpeg_with_orientation(&img, 6)).unwrap();
+    let t = thumbs::load_thumb(&dir.path().join("c"), &p, 64).unwrap();
+    let (top, bottom) = (t.get_pixel(32, 6), t.get_pixel(32, 57));
+    assert!(top[0] > 180 && top[2] < 80, "top should be red: {top:?}");
+    assert!(bottom[2] > 180 && bottom[0] < 80, "bottom should be blue: {bottom:?}");
+}

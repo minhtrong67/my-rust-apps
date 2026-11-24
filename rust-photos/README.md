@@ -36,12 +36,18 @@ No performance numbers were measured, so "faster than the Tauri build" is a goal
 
 ## Memory
 
-Decoded pixels dominate. Thumbnails are kept as 256x256 RGBA (256 KB each, plus a GPU copy) in a bounded cache
-(about 400 or `columns x 30`, whichever is larger); the viewer keeps at most 3 decoded pictures (long side capped at 6144 px)
-and frees them when you go back to the gallery. The OpenGL driver adds a baseline of its own that this app cannot control.
-To see where the memory goes, run with `FP_STATS=1` (PowerShell: `$env:FP_STATS=1; cargo run --release -p rust-photos`):
-the title bar then shows the live Rust heap, its peak, the thumbnail count and the viewer cache.
-Task Manager's number minus the Rust heap is what the graphics driver, DLLs and GPU textures use.
+What was measured (Linux, 24 JPEGs of 12 MP, `cargo run --release -p rust-photos-core --example membench`):
+
+| Thumbnail generation, 8 workers | peak memory | speed |
+|---|---|---|
+| decode whole picture, then shrink (first version) | 755 MB | 6.9 pictures/s |
+| JPEG decoded at 1/2-1/8 size (current) | 62 MB | 12.2 pictures/s |
+
+Opening one 12 MP picture in the viewer: peak 97 MB before, 85 MB now. The picture itself needs 46 MB as RGBA and the viewer keeps up to
+3 pictures; they are freed when you go back to the gallery. This was not measured on Windows or for the whole app: the graphics driver,
+GPU textures and DLLs are on top of it. To see the split, run with `FP_STATS=1`
+(PowerShell: `$env:FP_STATS=1; cargo run --release -p rust-photos`): the title bar shows the live Rust heap and its peak.
+Task Manager's number minus the Rust heap is what the driver and system libraries use.
 To compare renderers: `set SLINT_BACKEND=winit-software` before running (no GPU, slower, Mica may not show).
 
 ## Not ported yet

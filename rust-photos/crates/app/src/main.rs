@@ -86,7 +86,7 @@ fn main() {
         lang_cell,
         settings: settings.clone(),
         data: UserData::load(),
-        pool: Pool::new((cores.saturating_sub(1)).clamp(2, 8)),
+        pool: Pool::new(cores.saturating_sub(1).clamp(2, 4)),
         cache_dir,
         dir: String::new(),
         is_library: true,

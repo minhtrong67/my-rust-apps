@@ -10,6 +10,7 @@ description = "Pure Rust engine of Rust Photos: library, EXIF, thumbnails, editi
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "ico", "rayon"] }
+jpeg-decoder = { version = "0.3", default-features = false }
 kamadak-exif = "0.6"
 rayon = "1"
 trash = "5"

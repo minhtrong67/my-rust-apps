@@ -463,7 +463,9 @@ impl State {
         if self.thumb_cache.insert(path.clone(), img).is_none() {
             self.thumb_order.push_back(path);
             // Each thumbnail is 256 KB of pixels (plus a GPU copy). Keep a few screens worth, drop the oldest.
-            let cap = (self.cols * 30).max(400);
+            // enough for a 2400 px tall window plus a few spare rows; scrolling back reloads from the disk cache
+            let rows = 2400 / (self.settings.tile as usize + 6) + 4;
+            let cap = (self.cols * rows).max(150);
             while self.thumb_order.len() > cap {
                 let Some(old) = self.thumb_order.pop_front() else { break };
                 self.thumb_cache.remove(&old);
@@ -573,23 +575,51 @@ impl State {
 // ====================================================================== viewer
 fn prepare(path: &str) -> Result<Prepared, String> {
     let p = Path::new(path);
-    let img = decode::open_for_view(p, 6144)?;
+    let mut img = decode::open_upright(p)?;
+    // very large pictures are reduced so they stay light on memory and GPU
+    let max_side = 6144;
+    if img.width().max(img.height()) > max_side {
+        img = image::DynamicImage::ImageRgba8(thumbs::resize_rgba(&img.to_rgba8(), max_side));
+    }
+    let (w, h) = (img.width(), img.height());
+    let small = img.thumbnail(256, 256).to_rgba8();
+    // One pass straight into the buffer Slint keeps: no intermediate RGBA copy and no clone of it.
+    let mut buf = SharedPixelBuffer::<Rgba8Pixel>::new(w, h);
+    {
+        let dst = buf.make_mut_slice();
+        match img {
+            image::DynamicImage::ImageRgb8(rgb) => {
+                for (d, s) in dst.iter_mut().zip(rgb.pixels()) { *d = Rgba8Pixel { r: s[0], g: s[1], b: s[2], a: 255 }; }
+            }
+            other => {
+                for (d, s) in dst.iter_mut().zip(other.to_rgba8().pixels()) { *d = Rgba8Pixel { r: s[0], g: s[1], b: s[2], a: s[3] }; }
+            }
+        }
+    }
     let meta = std::fs::metadata(p).ok();
     let o = exif_util::orientation(p);
-    let real = image::image_dimensions(p).map(|(w, h)| if o >= 5 { (h, w) } else { (w, h) }).unwrap_or((img.width(), img.height()));
-    let small = thumbs::resize_rgba(&img, 256);
-    let h = rust_photos_core::edit::histogram(&small);
-    let max = h.iter().flat_map(|c| c.iter()).copied().max().unwrap_or(1);
+    let real = image::image_dimensions(p).map(|(w, h)| if o >= 5 { (h, w) } else { (w, h) }).unwrap_or((w, h));
+    let hist = hist_strings(&small);
     Ok(Prepared {
-        w: img.width(),
-        h: img.height(),
-        buf: to_buf(&img),
+        w,
+        h,
+        buf,
         real,
         exif: exif_util::read_info(p),
         size: meta.as_ref().map(|m| m.len()).unwrap_or(0),
         mtime: meta.and_then(|m| m.modified().ok()).and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0),
-        hist: [hist_path(&h[3], max), hist_path(&h[0], max), hist_path(&h[1], max), hist_path(&h[2], max)],
+        hist,
     })
+}
+
+fn hist_strings(small: &image::RgbaImage) -> [String; 4] {
+    let h = histogram_of(small);
+    let max = h.iter().flat_map(|c| c.iter()).copied().max().unwrap_or(1);
+    [hist_path(&h[3], max), hist_path(&h[0], max), hist_path(&h[1], max), hist_path(&h[2], max)]
+}
+
+fn histogram_of(small: &image::RgbaImage) -> [[u32; 256]; 4] {
+    rust_photos_core::edit::histogram(small)
 }
 
 impl State {

@@ -1,7 +1,7 @@
 //! Thumbnail cache: square JPEGs on disk, decoded in parallel on demand.
 use crate::decode;
 use fast_image_resize as fr;
-use image::RgbaImage;
+use image::{RgbImage, RgbaImage};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
@@ -27,6 +27,22 @@ pub fn resize_rgba(src: &RgbaImage, max_side: u32) -> RgbaImage {
         return src.clone();
     }
     resize_to(src, (w as f32 * k).round() as u32, (h as f32 * k).round() as u32, fr::FilterType::Lanczos3)
+}
+
+/// Same as `fill_square` for pictures without transparency (3 bytes per pixel instead of 4).
+pub fn fill_square_rgb(src: &RgbImage, size: u32) -> RgbImage {
+    let (w, h) = src.dimensions();
+    let side = w.min(h);
+    let (left, top) = ((w - side) / 2, (h - side) / 2);
+    let Ok(s) = fr::images::ImageRef::new(w, h, src.as_raw(), fr::PixelType::U8x3) else { return src.clone() };
+    let mut d = fr::images::Image::new(size, size, fr::PixelType::U8x3);
+    let opts = fr::ResizeOptions::new()
+        .resize_alg(fr::ResizeAlg::Convolution(fr::FilterType::Bilinear))
+        .crop(left as f64, top as f64, side as f64, side as f64);
+    if fr::Resizer::new().resize(&s, &mut d, &opts).is_err() {
+        return src.clone();
+    }
+    RgbImage::from_raw(size, size, d.into_vec()).unwrap_or_else(|| src.clone())
 }
 
 /// Centre-crops to a square and resizes to `size` x `size` (like CSS object-fit: cover).
@@ -64,15 +80,26 @@ pub fn load_thumb(dir: &Path, path: &Path, size: u32) -> Result<RgbaImage, Strin
     if let Ok(img) = image::open(&out) {
         return Ok(img.to_rgba8());
     }
-    let img = decode::open_upright(path)?.to_rgba8();
-    let t = fill_square(&img, size);
-    // Transparent pictures get a light backdrop in the cached JPEG.
-    let mut rgb = image::RgbImage::new(size, size);
-    for (d, s) in rgb.pixels_mut().zip(t.pixels()) {
-        let a = s[3] as u32;
-        let mix = |c: u8| ((c as u32 * a + 230 * (255 - a)) / 255) as u8;
-        *d = image::Rgb([mix(s[0]), mix(s[1]), mix(s[2])]);
-    }
+    // JPEG (most photos): decode at 1/2, 1/4 or 1/8 size straight away. Anything else: full decode.
+    let rgb: RgbImage = match if decode::is_jpeg(path) { decode::jpeg_scaled(path, (size * 2) as u16).ok() } else { None } {
+        Some(small) => fill_square_rgb(&small, size),
+        None => {
+            let img = decode::open_upright(path)?;
+            if img.color().has_alpha() {
+                // Transparent pictures get a light backdrop in the cached JPEG.
+                let t = fill_square(&img.to_rgba8(), size);
+                let mut rgb = RgbImage::new(size, size);
+                for (d, s) in rgb.pixels_mut().zip(t.pixels()) {
+                    let a = s[3] as u32;
+                    let mix = |c: u8| ((c as u32 * a + 230 * (255 - a)) / 255) as u8;
+                    *d = image::Rgb([mix(s[0]), mix(s[1]), mix(s[2])]);
+                }
+                rgb
+            } else {
+                fill_square_rgb(&img.into_rgb8(), size)
+            }
+        }
+    };
     let _ = std::fs::create_dir_all(dir);
     let tmp = out.with_extension("tmp");
     if rgb.save_with_format(&tmp, image::ImageFormat::Jpeg).is_ok() {
