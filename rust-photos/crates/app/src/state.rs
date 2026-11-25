@@ -123,6 +123,14 @@ pub struct State {
     pub row_models: Vec<Rc<VecModel<Tile>>>,
     pub tile_pos: Vec<(usize, usize)>,
     pub path_idx: HashMap<String, usize>,
+    /// per row: (is a heading, index of its first picture)
+    pub row_kinds: Vec<(bool, Option<usize>)>,
+    pub t0: std::time::Instant,
+    pub ms_window: f64,
+    pub ms_scan: f64,
+    pub ms_filter: f64,
+    pub ms_rows: f64,
+    pub search_timer: slint::Timer,
     pub thumb_cache: HashMap<String, Image>,
     pub thumb_order: VecDeque<String>,
     // viewer
@@ -154,6 +162,61 @@ fn tile_default(idx: usize, e: &Entry, fav: bool, selected: bool, img: Option<Im
 }
 
 impl State {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(ui: Weak<AppWindow>, lang_cell: Rc<Cell<Lang>>, settings: Settings, data: UserData, cache_dir: std::path::PathBuf, threads: usize, t0: std::time::Instant) -> State {
+        State {
+            ui,
+            lang_cell,
+            settings,
+            data,
+            pool: Pool::new(threads),
+            cache_dir,
+            dir: String::new(),
+            is_library: true,
+            entries: vec![],
+            scope_entries: vec![],
+            scope: Scope::All,
+            list: vec![],
+            folder_paths: vec![],
+            format_list: vec![],
+            search: String::new(),
+            selection: HashSet::new(),
+            selecting: false,
+            grid_w: 900.0,
+            cols: 1,
+            gen: 0,
+            row_models: vec![],
+            tile_pos: vec![],
+            path_idx: HashMap::new(),
+            row_kinds: vec![],
+            t0,
+            ms_window: 0.0,
+            ms_scan: 0.0,
+            ms_filter: 0.0,
+            ms_rows: 0.0,
+            search_timer: slint::Timer::default(),
+            thumb_cache: HashMap::new(),
+            thumb_order: VecDeque::new(),
+            current: None,
+            ctx: vec![],
+            view_gen: 0,
+            view_cache: HashMap::new(),
+            view_order: VecDeque::new(),
+            prepared: None,
+            strip_model: Rc::new(VecModel::default()),
+            slide_timer: slint::Timer::default(),
+            on_confirm: None,
+            on_prompt: None,
+            toast_timer: slint::Timer::default(),
+            toast_undo: None,
+            album_target: vec![],
+            dup_groups: vec![],
+            dup_keep: vec![],
+            batch_paths: vec![],
+            ed: None,
+        }
+    }
+
     pub fn ui(&self) -> AppWindow {
         self.ui.upgrade().expect("window alive")
     }
@@ -227,6 +290,7 @@ impl State {
     }
 
     fn library_loaded(&mut self, r: Result<library::Opened, String>, is_library: bool) {
+        if self.ms_scan == 0.0 { self.ms_scan = self.t0.elapsed().as_secs_f64() * 1000.0; }
         let ui = self.ui(); let app = ui.global::<App>();
         app.set_loading(false);
         app.set_loaded(true);
@@ -254,11 +318,11 @@ impl State {
                     let mut l = self.entries.clone();
                     library::sort_entries(&mut l, self.settings.sort);
                     let ctx: Vec<String> = l.into_iter().map(|e| e.path).collect();
-                    self.rebuild();
+                    self.rebuild_top();
                     self.open_viewer(cur, ctx);
                 } else {
                     app.set_view(0);
-                    self.rebuild();
+                    self.rebuild_top();
                 }
             }
         }
@@ -307,7 +371,7 @@ impl State {
         self.search.clear();
         app.set_search("".into());
         self.load_scope_entries();
-        self.rebuild();
+        self.rebuild_top();
     }
 
     fn scope_title(&self) -> String {
@@ -319,17 +383,78 @@ impl State {
         }
     }
 
-    /// Filters, sorts and groups the list, then rebuilds the rows the gallery shows.
+    /// Filters and sorts the pictures. Keeps the scroll position on the same picture where it can.
     pub fn rebuild(&mut self) {
+        let anchor = self.scroll_anchor();
+        self.refilter();
+        self.relayout();
+        self.restore_scroll(anchor);
+    }
+
+    /// Same, but starts at the top (new search, new scope, new folder).
+    pub fn rebuild_top(&mut self) {
+        self.refilter();
+        self.relayout();
+        self.ui().global::<App>().set_scroll_y(0.0);
+    }
+
+    /// Only the rows change (window got narrower, tile size or grouping changed): no filtering, no sorting.
+    pub fn relayout_keep(&mut self) {
+        let anchor = self.scroll_anchor();
+        self.relayout();
+        self.restore_scroll(anchor);
+    }
+
+    fn row_height(&self, head: bool) -> f32 {
+        if head { 44.0 } else { self.ui().global::<App>().get_tile_w() + 6.0 }
+    }
+
+    /// Path of the first picture visible at the top of the gallery.
+    fn scroll_anchor(&self) -> Option<String> {
+        let y = -self.ui().global::<App>().get_scroll_y();
+        if y < 1.0 { return None; }
+        let mut top = 0.0;
+        for (r, (head, _)) in self.row_kinds.iter().enumerate() {
+            let h = self.row_height(*head);
+            if y < top + h {
+                let idx = self.row_kinds[r..].iter().find_map(|(_, first)| *first)?;
+                return self.list.get(idx).map(|e| e.path.clone());
+            }
+            top += h;
+        }
+        None
+    }
+
+    fn restore_scroll(&mut self, anchor: Option<String>) {
         let ui = self.ui();
         let app = ui.global::<App>();
-        let lang = self.lang();
+        let Some(path) = anchor else { app.set_scroll_y(0.0); return };
+        let Some(&idx) = self.path_idx.get(&path) else { app.set_scroll_y(0.0); return };
+        let row = self.tile_pos[idx].0;
+        let top: f32 = self.row_kinds.iter().take(row).map(|(h, _)| self.row_height(*h)).sum();
+        // the list lays itself out a moment after the model changes; set the position after that
+        let weak = self.ui.clone();
+        slint::Timer::single_shot(std::time::Duration::from_millis(30), move || {
+            if let Some(u) = weak.upgrade() { u.global::<App>().set_scroll_y(-top); }
+        });
+    }
+
+    fn refilter(&mut self) {
+        let started = std::time::Instant::now();
+        let ui = self.ui();
+        let app = ui.global::<App>();
         let base: &Vec<Entry> = if self.scope == Scope::All { &self.entries } else { &self.scope_entries };
 
-        // folder and format choices come from the whole base list
-        let mut folders: Vec<String> = base.iter().map(|e| e.folder.clone()).collect::<HashSet<_>>().into_iter().collect();
+        // folder and format choices come from the whole base list (borrowed names, no per-picture allocation)
+        let mut folder_set: HashSet<&str> = HashSet::new();
+        let mut formats: Vec<String> = Vec::new();
+        for e in base.iter() {
+            folder_set.insert(e.folder.as_str());
+            let ext = Path::new(&e.path).extension().and_then(|x| x.to_str()).unwrap_or("");
+            if !ext.is_empty() && !formats.iter().any(|f| f.eq_ignore_ascii_case(ext)) { formats.push(ext.to_ascii_uppercase()); }
+        }
+        let mut folders: Vec<String> = folder_set.into_iter().map(|f| f.to_string()).collect();
         folders.sort();
-        let mut formats: Vec<String> = base.iter().map(|e| ext_upper(&e.path)).collect::<HashSet<_>>().into_iter().collect();
         formats.sort();
         let fi = app.get_folder_index();
         let fo = app.get_format_index();
@@ -340,7 +465,7 @@ impl State {
             .iter()
             .filter(|e| q.is_empty() || e.name.to_lowercase().contains(&q))
             .filter(|e| folder_sel.as_ref().map_or(true, |f| &e.folder == f))
-            .filter(|e| format_sel.as_ref().map_or(true, |f| &ext_upper(&e.path) == f))
+            .filter(|e| format_sel.as_ref().map_or(true, |f| Path::new(&e.path).extension().and_then(|x| x.to_str()).map_or(false, |x| x.eq_ignore_ascii_case(f))))
             .cloned()
             .collect();
         if matches!(self.scope, Scope::Fav) && self.settings.sort == SortKey::DateDesc {
@@ -359,44 +484,8 @@ impl State {
         self.format_list = formats;
         app.set_folder_items(ModelRc::new(VecModel::from(folder_items.into_iter().map(SharedString::from).collect::<Vec<_>>())));
         app.set_format_items(ModelRc::new(VecModel::from(format_items.into_iter().map(SharedString::from).collect::<Vec<_>>())));
-
-        // layout
-        let tile = self.settings.tile as f32;
-        let w = self.grid_w.max(240.0);
-        self.cols = (((w - PAD + GAP) / (tile + GAP)).floor() as usize).max(1);
-        app.set_tile_w(((w - PAD - GAP * (self.cols as f32 - 1.0)) / self.cols as f32).floor());
-
-        let by_date = matches!(self.settings.sort, SortKey::DateDesc | SortKey::DateAsc) && self.scope != Scope::Fav;
-        let grouped = self.settings.group && by_date;
-        let today = chrono::Local::now().date_naive();
-        let mut rows: Vec<Row> = Vec::new();
-        self.row_models.clear();
-        self.tile_pos = vec![(0, 0); list.len()];
-        let mut i = 0usize;
-        while i < list.len() {
-            let mut end = (i + self.cols).min(list.len());
-            if grouped {
-                let label = library::group_label(list[i].mtime, lang, today);
-                let mut j = i;
-                while j < list.len() && library::group_label(list[j].mtime, lang, today) == label { j += 1; }
-                rows.push(Row { head: true, title: label.into(), count: (j - i) as i32, tiles: ModelRc::default() });
-                self.row_models.push(Rc::new(VecModel::default()));
-                let mut k = i;
-                while k < j {
-                    end = (k + self.cols).min(j);
-                    self.push_tile_row(&mut rows, &list, k, end);
-                    k = end;
-                }
-                i = j;
-            } else {
-                self.push_tile_row(&mut rows, &list, i, end);
-                i = end;
-            }
-        }
         self.path_idx = list.iter().enumerate().map(|(i, e)| (e.path.clone(), i)).collect();
         self.list = list;
-        self.gen += 1;
-        app.set_rows(ModelRc::new(VecModel::from(rows)));
 
         let n = self.list.len();
         app.set_count_text(if n == 1 { self.tr("photo.1") } else { self.trf("photos.n", &[("n", &n.to_string())]) }.into());
@@ -409,8 +498,66 @@ impl State {
         };
         app.set_empty_title(t.into());
         app.set_empty_desc(d.into());
-        self.update_albums_model();
+        if self.scope == Scope::Albums { self.update_albums_model(); }
         self.update_sel_text();
+        self.ms_filter = started.elapsed().as_secs_f64() * 1000.0;
+    }
+
+    /// Cuts `self.list` into rows of tiles (with a heading row per day when grouping is on).
+    fn relayout(&mut self) {
+        let t = std::time::Instant::now();
+        let ui = self.ui();
+        let app = ui.global::<App>();
+        let lang = self.lang();
+        let list = std::mem::take(&mut self.list);
+
+        let tile = self.settings.tile as f32;
+        let w = self.grid_w.max(240.0);
+        self.cols = (((w - PAD + GAP) / (tile + GAP)).floor() as usize).max(1);
+        app.set_tile_w(((w - PAD - GAP * (self.cols as f32 - 1.0)) / self.cols as f32).floor());
+
+        let by_date = matches!(self.settings.sort, SortKey::DateDesc | SortKey::DateAsc) && self.scope != Scope::Fav;
+        let grouped = self.settings.group && by_date;
+        let today = chrono::Local::now().date_naive();
+        // one label per calendar day, not per picture
+        let mut memo: Option<(chrono::NaiveDate, String)> = None;
+        let mut label_of = |ms: u64| -> String {
+            let d = library::local_date(ms).unwrap_or(today);
+            if let Some((md, ml)) = &memo { if *md == d { return ml.clone(); } }
+            let l = library::group_label_date(d, lang, today);
+            memo = Some((d, l.clone()));
+            l
+        };
+        let mut rows: Vec<Row> = Vec::new();
+        self.row_models.clear();
+        self.row_kinds.clear();
+        self.tile_pos = vec![(0, 0); list.len()];
+        let mut i = 0usize;
+        while i < list.len() {
+            if grouped {
+                let label = label_of(list[i].mtime);
+                let mut j = i + 1;
+                while j < list.len() && label_of(list[j].mtime) == label { j += 1; }
+                rows.push(Row { head: true, title: label.into(), count: (j - i) as i32, tiles: ModelRc::default() });
+                self.row_models.push(Rc::new(VecModel::default()));
+                self.row_kinds.push((true, None));
+                let mut k = i;
+                while k < j {
+                    let end = (k + self.cols).min(j);
+                    self.push_tile_row(&mut rows, &list, k, end);
+                    k = end;
+                }
+                i = j;
+            } else {
+                let end = (i + self.cols).min(list.len());
+                self.push_tile_row(&mut rows, &list, i, end);
+                i = end;
+            }
+        }
+        self.list = list;
+        self.gen += 1;
+        app.set_rows(ModelRc::new(VecModel::from(rows)));
+        self.ms_rows = t.elapsed().as_secs_f64() * 1000.0;
     }
 
     fn push_tile_row(&mut self, rows: &mut Vec<Row>, list: &[Entry], a: usize, b: usize) {
@@ -421,6 +568,7 @@ impl State {
             })
             .collect();
         let row_idx = self.row_models.len();
+        self.row_kinds.push((false, Some(a)));
         for (c, idx) in (a..b).enumerate() { self.tile_pos[idx] = (row_idx, c); }
         let model = Rc::new(VecModel::from(tiles));
         rows.push(Row { head: false, title: SharedString::default(), count: 0, tiles: ModelRc::from(model.clone()) });
@@ -565,7 +713,7 @@ impl State {
         if (w - self.grid_w).abs() < 0.5 { return; }
         self.grid_w = w;
         let new_cols = (((w.max(240.0) - PAD + GAP) / (self.settings.tile as f32 + GAP)).floor() as usize).max(1);
-        if new_cols != self.cols && !self.list.is_empty() { self.rebuild(); } else {
+        if new_cols != self.cols && !self.list.is_empty() { self.relayout_keep(); } else {
             let ui = self.ui(); let app = ui.global::<App>();
             app.set_tile_w(((w.max(240.0) - PAD - GAP * (self.cols as f32 - 1.0)) / self.cols as f32).floor());
         }
@@ -1250,7 +1398,7 @@ impl State {
     pub fn setting(&mut self, key: &str, value: &str) {
         let i: i32 = value.parse().unwrap_or(0);
         let b = value == "1";
-        let mut relayout = false;
+        let mut relayout = 0;
         match key {
             "theme" => { self.settings.theme = [ThemeMode::System, ThemeMode::Light, ThemeMode::Dark][i.clamp(0, 2) as usize]; self.apply_look(); }
             "accent" => { if let Some(a) = theme::ACCENTS.get(i as usize) { self.settings.accent = a.hex.into(); self.apply_look(); } }
@@ -1270,13 +1418,13 @@ impl State {
             "slide-transition" => self.settings.slide.transition = [rust_photos_core::store::Transition::Fade, rust_photos_core::store::Transition::Slide, rust_photos_core::store::Transition::Zoom][i.clamp(0, 2) as usize],
             "slide-shuffle" => self.settings.slide.shuffle = b,
             "slide-loop" => self.settings.slide.repeat = b,
-            "sort" => { self.settings.sort = SortKey::ALL[i.clamp(0, 5) as usize]; relayout = true; }
-            "tile" => { self.settings.tile = i.clamp(110, 320) as u32; self.ui().global::<App>().set_tile_size(i); relayout = true; }
-            "group" => { self.settings.group = b; self.ui().global::<App>().set_group(b); relayout = true; }
+            "sort" => { self.settings.sort = SortKey::ALL[i.clamp(0, 5) as usize]; relayout = 1; }
+            "tile" => { self.settings.tile = i.clamp(110, 320) as u32; self.ui().global::<App>().set_tile_size(i); relayout = 2; }
+            "group" => { self.settings.group = b; self.ui().global::<App>().set_group(b); relayout = 2; }
             _ => {}
         }
         self.save_settings();
-        if relayout { self.rebuild(); }
+        match relayout { 1 => self.rebuild(), 2 => self.relayout_keep(), _ => {} }
     }
 
     pub fn reset_settings(&mut self) {
@@ -1345,7 +1493,7 @@ impl State {
             "open-folder" => self.pick_open_folder(),
             "open-files" => self.pick_open_files(),
             "refresh" => { if self.scope == Scope::All { self.refresh(); } else { self.load_scope_entries(); self.rebuild(); } let m = self.tr("toast.refreshed"); self.toast(0, m, None); }
-            "filter" => self.rebuild(),
+            "filter" => self.rebuild_top(),
             "select-mode" => { let on = !self.selecting; self.set_select_mode(on); }
             "select-all" => { self.selecting = true; app.set_selecting(true); self.selection = self.list.iter().map(|e| e.path.clone()).collect(); self.refresh_all_tiles(); }
             "toggle" => self.toggle_select(i as usize),

@@ -69,6 +69,9 @@ impl Default for Slideshow {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default)]
 pub struct Settings {
+    /// 0 = file written before the Rust palette existed
+    #[serde(default = "zero_version")]
+    pub version: u32,
     pub theme: ThemeMode,
     pub accent: String,
     pub material: Material,
@@ -92,11 +95,18 @@ pub struct Settings {
     pub window_max: bool,
 }
 
+fn zero_version() -> u32 {
+    0
+}
+
+pub const SETTINGS_VERSION: u32 = 2;
+
 impl Default for Settings {
     fn default() -> Self {
         Settings {
+            version: SETTINGS_VERSION,
             theme: ThemeMode::System,
-            accent: "#0078D4".into(),
+            accent: crate::theme::DEFAULT_ACCENT.into(),
             material: Material::Mica,
             nav_compact: false,
             font_size: FontSize::Md,
@@ -159,9 +169,20 @@ fn save<T: Serialize>(name: &str, v: &T) -> Result<(), String> {
 }
 
 impl Settings {
+    /// Brings an older settings file up to date. Returns true when something changed.
+    /// Version 2 introduced the Rust palette: only the old default blue moves to the new default accent;
+    /// a colour the user picked on purpose is kept.
+    pub fn migrate(&mut self) -> bool {
+        if self.version >= SETTINGS_VERSION { return false; }
+        if self.accent.eq_ignore_ascii_case("#0078D4") { self.accent = crate::theme::DEFAULT_ACCENT.into(); }
+        self.version = SETTINGS_VERSION;
+        true
+    }
+
     pub fn load() -> Settings {
         let first_run = !config_dir().join("settings.json").exists();
         let mut s: Settings = load("settings.json");
+        if s.migrate() { let _ = s.save(); }
         if first_run {
             // The Tauri version stored the window mode in its own folder; keep that choice.
             if let Some(old) = dirs::config_dir().map(|d| d.join("com.minhtrong67.materialphoto").join("settings.json")) {

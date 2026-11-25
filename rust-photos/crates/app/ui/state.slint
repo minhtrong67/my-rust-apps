@@ -34,6 +34,9 @@ export global App {
     in property <string> sel-text;
     in property <[AlbumItem]> albums;
     in-out property <bool> drop-active: false;
+    in-out property <length> scroll-y: 0px;     // gallery scroll position, set from Rust to keep the place
+    in-out property <int> hover-idx: -1;        // picture under the pointer: target of the right-click menu
+    in-out property <bool> hover-fav: false;
 
     // ---- viewer ----
     in property <image> view-image;
@@ -171,5 +174,4 @@ export global App {
     callback ed-canvas(int, float, float);   // 0 down, 1 move, 2 up
     callback ed-text-edited(string);
     callback ed-style-changed();
-    pure callback hist-open(bool) -> bool;
 }

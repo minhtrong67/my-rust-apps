@@ -4,7 +4,7 @@ use slint::platform::{Platform, WindowAdapter};
 use slint::{ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel};
 use std::rc::Rc;
 
-slint::include_modules!();
+use rust_photos::*;
 
 struct P(Rc<MinimalSoftwareWindow>);
 impl Platform for P {
@@ -81,7 +81,7 @@ fn main() {
     save(&win, w, h, &format!("viewer-{sfx}"));
     // settings
     app.set_view(0);
-    let sw: Vec<slint::Color> = (0..15).map(|i| slint::Color::from_rgb_u8((i * 17) as u8, 120, (255 - i * 12) as u8)).collect();
+    let sw: Vec<slint::Color> = ["#CE422B", "#F74C00", "#B7410E", "#DEA584", "#0078D4", "#0063B1", "#0099BC", "#00B7C3", "#038387", "#10893E", "#6B69D6", "#8764B8", "#B146C2", "#E3008C", "#D13438", "#DA3B01", "#F7630C", "#FF8C00", "#68768A"].iter().map(|h| { let n = u32::from_str_radix(&h[1..], 16).unwrap(); slint::Color::from_rgb_u8((n >> 16) as u8, (n >> 8) as u8, n as u8) }).collect();
     app.set_swatches(ModelRc::new(VecModel::from(sw)));
     app.set_settings_open(true);
     save(&win, w, h, &format!("settings-{sfx}"));

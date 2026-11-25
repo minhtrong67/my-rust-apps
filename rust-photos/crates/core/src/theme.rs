@@ -6,7 +6,13 @@ pub struct Accent {
     pub en: &'static str,
 }
 
-pub const ACCENTS: [Accent; 15] = [
+pub const DEFAULT_ACCENT: &str = "#CE422B";
+
+pub const ACCENTS: [Accent; 19] = [
+    Accent { id: "rust-red", hex: "#CE422B", vi: "Rỉ sắt", en: "Rust" },
+    Accent { id: "ferris", hex: "#F74C00", vi: "Cam Ferris", en: "Ferris" },
+    Accent { id: "copper", hex: "#B7410E", vi: "Đồng", en: "Copper" },
+    Accent { id: "sand", hex: "#DEA584", vi: "Cát", en: "Sand" },
     Accent { id: "blue", hex: "#0078D4", vi: "Xanh dương", en: "Blue" },
     Accent { id: "cobalt", hex: "#0063B1", vi: "Xanh cô-ban", en: "Cobalt" },
     Accent { id: "sky", hex: "#0099BC", vi: "Xanh da trời", en: "Sky" },

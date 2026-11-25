@@ -38,7 +38,7 @@ export component IconBtn inherits Rectangle {
     if root.show-tip && ta.has-hover : Rectangle {
         y: root.height + 4px; x: (root.width - self.width) / 2;
         width: tip-text.preferred-width + 16px; height: 26px; border-radius: 4px;
-        background: Theme.dark ? #3a3a3a : #ffffff; border-width: 1px; border-color: Theme.stroke-strong;
+        background: Theme.dark ? #3a3430 : #ffffff; border-width: 1px; border-color: Theme.stroke-strong;
         drop-shadow-blur: 8px; drop-shadow-color: #00000030;
         tip-text := Text { text: root.tip; color: Theme.text; font-size: Theme.fs-small; horizontal-alignment: center; vertical-alignment: center; }
     }

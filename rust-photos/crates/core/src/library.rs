@@ -202,11 +202,15 @@ pub fn sort_entries(list: &mut [Entry], key: SortKey) {
     }
 }
 
-/// Day-group heading for a timestamp: Today, Yesterday, This week, This month, then "Month Year".
-pub fn group_label(mtime_ms: u64, lang: crate::i18n::Lang, today: chrono::NaiveDate) -> String {
-    use chrono::{Datelike, TimeZone};
-    let Some(dt) = chrono::Local.timestamp_millis_opt(mtime_ms as i64).single() else { return String::new() };
-    let d = dt.date_naive();
+/// Local calendar date of a modification time (milliseconds since 1970).
+pub fn local_date(mtime_ms: u64) -> Option<chrono::NaiveDate> {
+    use chrono::TimeZone;
+    chrono::Local.timestamp_millis_opt(mtime_ms as i64).single().map(|d| d.date_naive())
+}
+
+/// Day-group heading for a date: Today, Yesterday, This week, This month, then "Month Year".
+pub fn group_label_date(d: chrono::NaiveDate, lang: crate::i18n::Lang, today: chrono::NaiveDate) -> String {
+    use chrono::Datelike;
     let diff = (today - d).num_days();
     let tr = |k| crate::i18n::tr(lang, k);
     if diff <= 0 { return tr("date.today"); }
@@ -218,6 +222,11 @@ pub fn group_label(mtime_ms: u64, lang: crate::i18n::Lang, today: chrono::NaiveD
         crate::i18n::Lang::Vi => format!("tháng {} năm {}", d.month(), d.year()),
         crate::i18n::Lang::En => format!("{} {}", EN[d.month0() as usize], d.year()),
     }
+}
+
+/// Same, from a timestamp.
+pub fn group_label(mtime_ms: u64, lang: crate::i18n::Lang, today: chrono::NaiveDate) -> String {
+    local_date(mtime_ms).map(|d| group_label_date(d, lang, today)).unwrap_or_default()
 }
 
 /// Human readable file size.

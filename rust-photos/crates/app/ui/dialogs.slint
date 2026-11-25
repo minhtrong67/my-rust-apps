@@ -12,7 +12,7 @@ component Modal inherits Rectangle {
         width: min(root.w, parent.width - 32px);
         height: min(col.preferred-height + 8px, parent.height - 32px);
         x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
-        background: Theme.dark ? #2b2b2b : #f9f9f9; border-radius: 8px; border-width: 1px; border-color: Theme.stroke-strong;
+        background: Theme.dialog; border-radius: 8px; border-width: 1px; border-color: Theme.stroke-strong;
         drop-shadow-blur: 32px; drop-shadow-color: #00000066; drop-shadow-offset-y: 8px;
         TouchArea { }
         col := VerticalLayout { padding: 20px; spacing: 14px;
@@ -147,7 +147,7 @@ export component SettingsDialog inherits Rectangle {
     Rectangle {
         width: min(680px, parent.width - 32px); height: min(700px, parent.height - 32px);
         x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
-        background: Theme.dark ? #2b2b2b : #f9f9f9; border-radius: 8px; border-width: 1px; border-color: Theme.stroke-strong;
+        background: Theme.dialog; border-radius: 8px; border-width: 1px; border-color: Theme.stroke-strong;
         drop-shadow-blur: 32px; drop-shadow-color: #00000066; drop-shadow-offset-y: 8px;
         TouchArea { }
         VerticalLayout {
@@ -162,8 +162,8 @@ export component SettingsDialog inherits Rectangle {
                             Segmented { width: 270px; items: [Tr.t("set.theme.system"), Tr.t("set.theme.light"), Tr.t("set.theme.dark")]; index: App.set-theme; picked(i) => { App.set-theme = i; App.set("theme", i); } } }
                         SettingRow { title: Tr.t("set.color");
                             VerticalLayout { spacing: 6px; width: 300px;
-                                Flickable { height: 66px; content-width: 300px;
-                                    for i in 15 : Rectangle { x: mod(i, 8) * 36px; y: floor(i / 8) * 32px; width: 30px; height: 28px; border-radius: 14px;
+                                Flickable { height: ceil(App.swatches.length / 8) * 32px + 4px; content-width: 300px;
+                                    for i in App.swatches.length : Rectangle { x: mod(i, 8) * 36px; y: floor(i / 8) * 32px; width: 30px; height: 28px; border-radius: 14px;
                                         background: App.swatches[i]; border-width: App.set-accent-index == i ? 2px : 0px; border-color: Theme.text;
                                         TouchArea { mouse-cursor: pointer; clicked => { App.set-accent-index = i; App.set("accent", i); } } } }
                             } }

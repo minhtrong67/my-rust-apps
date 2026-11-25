@@ -101,7 +101,7 @@ export component ViewerView inherits Rectangle {
                     moved => {
                         if (self.pressed) { root.pan-x = self.px0 + self.mouse-x - self.sx; root.pan-y = self.py0 + self.mouse-y - self.sy; root.clamp-pan(); }
                     }
-                    double-clicked => { if (root.zoom > 1.01) { root.fit-window(); } else { root.zoom-to(2.0 / root.fit > 8 ? 8 : 2.0 / max(0.01, root.fit) * root.fit * 1.0 + 1.0, self.mouse-x, self.mouse-y); } }
+                    double-clicked => { if (root.zoom > 1.01) { root.fit-window(); } else { root.zoom-to(root.fit < 0.99 ? 1.0 / root.fit : 2.0, self.mouse-x, self.mouse-y); } }
                 }
                 // side arrows
                 if App.has-prev : Rectangle { x: 10px; y: (parent.height - 44px) / 2; width: 36px; height: 44px; border-radius: 6px;

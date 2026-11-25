@@ -14,15 +14,19 @@ component TileView inherits Rectangle {
     border-width: tile.selected ? 2px : 0px;
     border-color: Theme.accent;
     init => { if (!tile.loaded) { App.need-thumb(tile.idx); } }
+    // one menu for the whole list (below) acts on the picture the pointer is over
+    property <bool> fav-now: tile.fav;
+    changed hovered => { if (root.hovered) { App.hover-idx = tile.idx; App.hover-fav = tile.fav; } }
+    changed fav-now => { if (root.hovered) { App.hover-fav = root.fav-now; } }
 
-    if tile.loaded : Image {
+    Skeleton { width: parent.width; height: parent.height; }
+    Image {
         source: tile.thumb;
         width: parent.width; height: parent.height;
         image-fit: cover;
-        opacity: 1;
-        animate opacity { duration: Theme.t-med; }
+        opacity: tile.loaded ? 1 : 0;
+        animate opacity { duration: Theme.t-med; easing: ease-out; }
     }
-    if !tile.loaded : Skeleton { width: parent.width; height: parent.height; }
 
     ta := TouchArea {
         mouse-cursor: pointer;
@@ -56,26 +60,6 @@ component TileView inherits Rectangle {
         background: root.hovered ? #00000066 : transparent;
         Icon { glyph: @image-url("icons/heart.svg"); size: 16px; tint: tile.fav ? #ff5b7a : #ffffff; x: 5px; y: 5px; }
         fav-ta := TouchArea { mouse-cursor: pointer; clicked => { App.act("fav", tile.idx); } }
-    }
-    ContextMenuArea {
-        Menu {
-            MenuItem { title: Tr.t("act.open"); activated => { App.act("open", tile.idx); } }
-            MenuItem { title: Tr.t("act.edit"); activated => { App.act("edit", tile.idx); } }
-            MenuItem { title: tile.fav ? Tr.t("fav.remove") : Tr.t("fav.add"); activated => { App.act("fav", tile.idx); } }
-            MenuItem { title: Tr.t("alb.addTo"); activated => { App.act("album", tile.idx); } }
-            MenuSeparator {}
-            MenuItem { title: Tr.t("gal.selectMode"); activated => { App.act("toggle", tile.idx); } }
-            MenuItem { title: Tr.t("act.copyImage"); activated => { App.act("copy-image", tile.idx); } }
-            MenuItem { title: Tr.t("act.copyPath"); activated => { App.act("copy-path", tile.idx); } }
-            MenuItem { title: Tr.t("act.reveal"); activated => { App.act("reveal", tile.idx); } }
-            MenuItem { title: Tr.t("act.wallpaper"); activated => { App.act("wallpaper", tile.idx); } }
-            MenuSeparator {}
-            MenuItem { title: Tr.t("rename"); activated => { App.act("rename", tile.idx); } }
-            MenuItem { title: Tr.t("act.copyTo"); activated => { App.act("copy-to", tile.idx); } }
-            MenuItem { title: Tr.t("act.moveTo"); activated => { App.act("move-to", tile.idx); } }
-            MenuSeparator {}
-            MenuItem { title: Tr.t("delete"); activated => { App.act("delete", tile.idx); } }
-        }
     }
 }
 
@@ -172,7 +156,28 @@ export component GalleryView inherits Rectangle {
                 }
             }
             if App.scope != 2 : ListView {
+                content-y <=> App.scroll-y;
                 for r in App.rows : GridRow { data: r; }
+            }
+            if App.scope != 2 : ContextMenuArea {
+                Menu {
+                    MenuItem { title: Tr.t("act.open"); activated => { App.act("open", App.hover-idx); } }
+                    MenuItem { title: Tr.t("act.edit"); activated => { App.act("edit", App.hover-idx); } }
+                    MenuItem { title: App.hover-fav ? Tr.t("fav.remove") : Tr.t("fav.add"); activated => { App.act("fav", App.hover-idx); } }
+                    MenuItem { title: Tr.t("alb.addTo"); activated => { App.act("album", App.hover-idx); } }
+                    MenuSeparator {}
+                    MenuItem { title: Tr.t("gal.selectMode"); activated => { App.act("toggle", App.hover-idx); } }
+                    MenuItem { title: Tr.t("act.copyImage"); activated => { App.act("copy-image", App.hover-idx); } }
+                    MenuItem { title: Tr.t("act.copyPath"); activated => { App.act("copy-path", App.hover-idx); } }
+                    MenuItem { title: Tr.t("act.reveal"); activated => { App.act("reveal", App.hover-idx); } }
+                    MenuItem { title: Tr.t("act.wallpaper"); activated => { App.act("wallpaper", App.hover-idx); } }
+                    MenuSeparator {}
+                    MenuItem { title: Tr.t("rename"); activated => { App.act("rename", App.hover-idx); } }
+                    MenuItem { title: Tr.t("act.copyTo"); activated => { App.act("copy-to", App.hover-idx); } }
+                    MenuItem { title: Tr.t("act.moveTo"); activated => { App.act("move-to", App.hover-idx); } }
+                    MenuSeparator {}
+                    MenuItem { title: Tr.t("delete"); activated => { App.act("delete", App.hover-idx); } }
+                }
             }
             // size tracking so Rust can lay out the columns
             Rectangle { width: parent.width; height: 0px; changed width => { App.grid-resized(self.width); } init => { App.grid-resized(self.width); } }

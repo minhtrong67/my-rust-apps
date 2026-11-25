@@ -253,3 +253,18 @@ fn scaled_jpeg_thumbnail_respects_exif_orientation() {
     assert!(top[0] > 180 && top[2] < 80, "top should be red: {top:?}");
     assert!(bottom[2] > 180 && bottom[0] < 80, "bottom should be blue: {bottom:?}");
 }
+
+#[test]
+fn old_default_blue_moves_to_the_rust_accent_but_custom_colours_stay() {
+    let mut old: store::Settings = serde_json::from_str(r##"{"accent":"#0078D4","theme":"dark"}"##).unwrap();
+    assert_eq!(old.version, 0, "a file written before the palette change has no version");
+    assert!(old.migrate());
+    assert_eq!(old.accent, theme::DEFAULT_ACCENT);
+    assert_eq!(old.theme, store::ThemeMode::Dark, "other settings are untouched");
+    assert!(!old.migrate(), "runs once");
+    let mut custom: store::Settings = serde_json::from_str(r##"{"accent":"#8764B8"}"##).unwrap();
+    custom.migrate();
+    assert_eq!(custom.accent, "#8764B8");
+    assert_eq!(store::Settings::default().accent, theme::DEFAULT_ACCENT);
+    assert!(theme::ACCENTS.iter().any(|a| a.hex == theme::DEFAULT_ACCENT));
+}

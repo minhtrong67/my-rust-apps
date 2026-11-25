@@ -122,7 +122,7 @@ export component AppWindow inherits Window {
     if App.toast-visible : Rectangle {
         x: (parent.width - self.width) / 2; y: parent.height - self.height - (App.view == 1 ? 120px : 28px);
         width: min(parent.width - 32px, tr.preferred-width + 32px + (App.toast-action != "" ? 90px : 0px)); height: 44px;
-        border-radius: 6px; background: Theme.dark ? #3a3a3a : #ffffff; border-width: 1px; border-color: Theme.stroke-strong;
+        border-radius: 6px; background: Theme.dark ? #3a3430 : #ffffff; border-width: 1px; border-color: Theme.stroke-strong;
         drop-shadow-blur: 16px; drop-shadow-color: #00000050; drop-shadow-offset-y: 4px;
         HorizontalLayout { padding-left: 16px; padding-right: 8px; spacing: 10px;
             Rectangle { width: 4px; height: 20px; y: 12px; border-radius: 2px; background: App.toast-kind == 3 ? #e5484d : App.toast-kind == 1 ? #30a46c : App.toast-kind == 2 ? #f5a623 : Theme.accent; }

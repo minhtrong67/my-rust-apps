@@ -34,10 +34,6 @@ pub fn dir_name(p: &str) -> String {
     Path::new(p).parent().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
-pub fn ext_upper(p: &str) -> String {
-    Path::new(p).extension().map(|e| e.to_string_lossy().to_uppercase()).unwrap_or_default()
-}
-
 /// Opens the file manager with the picture selected.
 pub fn reveal(path: &str) {
     #[cfg(windows)]
