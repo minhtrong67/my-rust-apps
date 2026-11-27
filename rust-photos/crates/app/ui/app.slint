@@ -16,8 +16,8 @@ component NavItem inherits Rectangle {
     in property <bool> on: false;
     in property <bool> compact: false;
     callback clicked();
-    height: 38px;
-    border-radius: 5px;
+    height: 40px;
+    border-radius: 4px;
     background: on ? Theme.subtle-hover : ta.pressed ? Theme.subtle-press : ta.has-hover ? Theme.subtle-hover : transparent;
     animate background { duration: Theme.t-fast; }
     Rectangle { x: 0px; y: (parent.height - 16px) / 2; width: 3px; height: 16px; border-radius: 1.5px; background: Theme.accent; visible: on; }
@@ -65,6 +65,7 @@ export component AppWindow inherits Window {
                 if (e.text == "1") { viewer.actual-size(); return accept; }
                 if (e.text == "c" && e.modifiers.control) { App.act("view-copy", 0); return accept; }
             }
+            if (App.view == 1 && (e.text == "t" || e.text == "T")) { App.act("strip-toggle", 0); return accept; }
             if (App.view == 2) {
                 if (e.text == "z" && e.modifiers.control) { App.act("ed-undo", 0); return accept; }
                 if (e.text == "y" && e.modifiers.control) { App.act("ed-redo", 0); return accept; }
@@ -122,7 +123,7 @@ export component AppWindow inherits Window {
     if App.toast-visible : Rectangle {
         x: (parent.width - self.width) / 2; y: parent.height - self.height - (App.view == 1 ? 120px : 28px);
         width: min(parent.width - 32px, tr.preferred-width + 32px + (App.toast-action != "" ? 90px : 0px)); height: 44px;
-        border-radius: 6px; background: Theme.dark ? #3a3430 : #ffffff; border-width: 1px; border-color: Theme.stroke-strong;
+        border-radius: 6px; background: Theme.flyout; border-width: 1px; border-color: Theme.stroke-strong;
         drop-shadow-blur: 16px; drop-shadow-color: #00000050; drop-shadow-offset-y: 4px;
         HorizontalLayout { padding-left: 16px; padding-right: 8px; spacing: 10px;
             Rectangle { width: 4px; height: 20px; y: 12px; border-radius: 2px; background: App.toast-kind == 3 ? #e5484d : App.toast-kind == 1 ? #30a46c : App.toast-kind == 2 ? #f5a623 : Theme.accent; }

@@ -2,51 +2,72 @@ import { Theme, Tr } from "theme.slint";
 import { App } from "state.slint";
 import { Icon, IconBtn, Btn, FSwitch, FSlider, Segmented, Dropdown, FTextBox, Stepper } from "widgets.slint";
 
+// WinUI 3 ContentDialog: title and content on top, a darker command area with equal-width buttons below.
 component Modal inherits Rectangle {
-    in property <length> w: 420px;
+    in property <length> w: 440px;
     in property <string> title;
+    in property <string> primary-text;
+    in property <string> secondary-text;
+    in property <bool> primary-enabled: true;
     callback dismiss();
+    callback primary();
+    callback secondary();
     background: Theme.scrim;
     TouchArea { clicked => { root.dismiss(); } }
     Rectangle {
         width: min(root.w, parent.width - 32px);
-        height: min(col.preferred-height + 8px, parent.height - 32px);
+        height: min(col.preferred-height, parent.height - 32px);
         x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
         background: Theme.dialog; border-radius: 8px; border-width: 1px; border-color: Theme.stroke-strong;
-        drop-shadow-blur: 32px; drop-shadow-color: #00000066; drop-shadow-offset-y: 8px;
+        drop-shadow-blur: 48px; drop-shadow-color: #00000066; drop-shadow-offset-y: 16px;
         TouchArea { }
-        col := VerticalLayout { padding: 20px; spacing: 14px;
-            Text { text: root.title; color: Theme.text; font-size: 18px * Theme.scale; font-weight: 600; wrap: word-wrap; }
-            @children
+        col := VerticalLayout {
+            VerticalLayout { padding: 24px; padding-bottom: 24px; spacing: 12px;
+                Text { text: root.title; color: Theme.text; font-size: Theme.fs-title; font-weight: 600; wrap: word-wrap; }
+                @children
+            }
+            if root.primary-text != "" || root.secondary-text != "" : Rectangle {
+                height: 80px; background: Theme.command-space;
+                border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+                Rectangle { y: 0px; height: 1px; background: Theme.stroke; }
+                HorizontalLayout { padding: 24px; spacing: 8px;
+                    if root.primary-text != "" : Btn { text: root.primary-text; accent: true; enabled: root.primary-enabled; horizontal-stretch: 1; clicked => { root.primary(); } }
+                    if root.secondary-text != "" : Btn { text: root.secondary-text; horizontal-stretch: 1; clicked => { root.secondary(); } }
+                }
+            }
         }
     }
 }
 
 export component ConfirmDialog inherits Modal {
     title: App.confirm-title;
+    primary-text: App.confirm-yes;
+    secondary-text: Tr.t("cancel");
     dismiss => { App.confirm-result(false); }
-    Text { text: App.confirm-desc; color: Theme.text-2; font-size: Theme.fs; wrap: word-wrap; }
-    HorizontalLayout { spacing: 8px; alignment: end;
-        Btn { text: Tr.t("cancel"); clicked => { App.confirm-result(false); } }
-        Btn { text: App.confirm-yes; accent: !App.confirm-danger; danger: App.confirm-danger; clicked => { App.confirm-result(true); } }
-    }
+    primary => { App.confirm-result(true); }
+    secondary => { App.confirm-result(false); }
+    if App.confirm-desc != "" : Text { text: App.confirm-desc; color: Theme.text-2; font-size: Theme.fs; wrap: word-wrap; }
 }
 
 export component PromptDialog inherits Modal {
     title: App.prompt-title;
+    primary-text: App.prompt-yes;
+    secondary-text: Tr.t("cancel");
     dismiss => { App.prompt-result(false, ""); }
+    primary => { App.prompt-result(true, ed.text); }
+    secondary => { App.prompt-result(false, ""); }
     Text { text: App.prompt-label; color: Theme.text-2; font-size: Theme.fs; }
     ed := FTextBox { text <=> App.prompt-value; accepted(t) => { App.prompt-result(true, t); } init => { self.focus-and-select(); } }
-    HorizontalLayout { spacing: 8px; alignment: end;
-        Btn { text: Tr.t("cancel"); clicked => { App.prompt-result(false, ""); } }
-        Btn { text: App.prompt-yes; accent: true; clicked => { App.prompt-result(true, ed.text); } }
-    }
 }
 
 export component BatchDialog inherits Modal {
     w: 520px;
     title: Tr.t("br.title");
+    primary-text: App.batch-apply-text;
+    secondary-text: Tr.t("cancel");
     dismiss => { App.batch-open = false; }
+    primary => { App.act("batch-apply", 0); }
+    secondary => { App.batch-open = false; }
     Text { text: Tr.t("br.pattern"); color: Theme.text-2; font-size: Theme.fs; }
     FTextBox { text <=> App.batch-pattern; edited(t) => { App.batch-changed(); } }
     Text { text: Tr.t("br.hint"); color: Theme.text-3; font-size: Theme.fs-small; wrap: word-wrap; }
@@ -57,20 +78,21 @@ export component BatchDialog inherits Modal {
             Stepper { value <=> App.batch-digits; minimum: 1; maximum: 8; changed(v) => { App.batch-changed(); } } }
     }
     Text { text: Tr.t("br.preview"); color: Theme.text-2; font-size: Theme.fs; }
-    Rectangle { height: 110px; border-radius: 6px; background: Theme.card; border-width: 1px; border-color: Theme.stroke; clip: true;
+    Rectangle { height: 110px; border-radius: 4px; background: Theme.card; border-width: 1px; border-color: Theme.stroke; clip: true;
         VerticalLayout { padding: 8px; spacing: 2px; for p in App.batch-preview : Text { text: p; color: Theme.text; font-size: Theme.fs-small; overflow: elide; } } }
-    HorizontalLayout { spacing: 8px; alignment: end;
-        Btn { text: Tr.t("cancel"); clicked => { App.batch-open = false; } }
-        Btn { text: App.batch-apply-text; accent: true; clicked => { App.act("batch-apply", 0); } }
-    }
 }
 
 export component DupDialog inherits Modal {
     w: 640px;
     title: Tr.t("dup.title");
+    primary-text: App.dup-trash-text;
+    primary-enabled: App.dup-groups.length > 0;
+    secondary-text: Tr.t("close");
     dismiss => { App.dup-open = false; }
+    primary => { App.act("dup-trash", 0); }
+    secondary => { App.dup-open = false; }
     Text { text: App.dup-scanning ? Tr.t("dup.scan") : App.dup-summary; color: Theme.text-2; font-size: Theme.fs; wrap: word-wrap; }
-    Rectangle { height: 320px; border-radius: 6px; background: Theme.card; border-width: 1px; border-color: Theme.stroke; clip: true;
+    Rectangle { height: 320px; border-radius: 4px; background: Theme.card; border-width: 1px; border-color: Theme.stroke; clip: true;
         Flickable { content-height: dcol.preferred-height + 8px;
             dcol := VerticalLayout { padding: 10px; spacing: 10px;
                 for g[gi] in App.dup-groups : VerticalLayout { spacing: 4px;
@@ -88,37 +110,34 @@ export component DupDialog inherits Modal {
             }
         }
     }
-    HorizontalLayout { spacing: 8px; alignment: end;
-        Btn { text: Tr.t("close"); clicked => { App.dup-open = false; } }
-        Btn { text: App.dup-trash-text; danger: true; enabled: App.dup-groups.length > 0; clicked => { App.act("dup-trash", 0); } }
-    }
 }
 
 export component AlbumPicker inherits Modal {
     title: Tr.t("pick.album");
+    primary-text: Tr.t("alb.new");
+    secondary-text: Tr.t("cancel");
     dismiss => { App.album-pick-open = false; }
+    primary => { App.act("album-new-pick", 0); }
+    secondary => { App.album-pick-open = false; }
     if App.albums.length == 0 : Text { text: Tr.t("pick.noAlbum"); color: Theme.text-2; font-size: Theme.fs; }
-    for a in App.albums : Rectangle { height: 38px; border-radius: 4px; background: ta.has-hover ? Theme.subtle-hover : transparent;
+    for a in App.albums : Rectangle { height: 40px; border-radius: 4px; background: ta.has-hover ? Theme.subtle-hover : transparent;
         HorizontalLayout { padding-left: 10px; spacing: 8px;
-            Icon { glyph: @image-url("icons/folder-heart.svg"); size: 16px; y: 11px; tint: Theme.accent-text; }
+            Icon { glyph: @image-url("icons/folder-heart.svg"); size: 16px; y: 12px; tint: Theme.accent-text; }
             Text { text: a.name; color: Theme.text; font-size: Theme.fs; vertical-alignment: center; }
             Text { text: a.count; color: Theme.text-3; font-size: Theme.fs-small; vertical-alignment: center; } }
         ta := TouchArea { mouse-cursor: pointer; clicked => { App.pick-album(a.id); } } }
-    HorizontalLayout { spacing: 8px; alignment: end;
-        Btn { text: Tr.t("alb.new"); glyph: @image-url("icons/plus.svg"); clicked => { App.act("album-new-pick", 0); } }
-        Btn { text: Tr.t("cancel"); clicked => { App.album-pick-open = false; } }
-    }
 }
 
 export component AboutDialog inherits Modal {
     title: Tr.t("app");
+    secondary-text: Tr.t("close");
     dismiss => { App.about-open = false; }
+    secondary => { App.about-open = false; }
     Image { source: @image-url("icon.svg"); width: 64px; height: 64px; }
     Text { text: Tr.t("about.desc"); color: Theme.text-2; font-size: Theme.fs; wrap: word-wrap; }
     Text { text: App.app-version; color: Theme.text; font-size: Theme.fs; }
     Text { text: "minhtrong67 · " + Tr.t("about.ai"); color: Theme.text-2; font-size: Theme.fs-small; wrap: word-wrap; }
     Text { text: "Made with Slint (royalty-free license) · Lucide icons (ISC)"; color: Theme.text-3; font-size: Theme.fs-small; wrap: word-wrap; }
-    HorizontalLayout { alignment: end; Btn { text: Tr.t("close"); clicked => { App.about-open = false; } } }
 }
 
 component Section inherits VerticalLayout {
@@ -148,7 +167,7 @@ export component SettingsDialog inherits Rectangle {
         width: min(680px, parent.width - 32px); height: min(700px, parent.height - 32px);
         x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
         background: Theme.dialog; border-radius: 8px; border-width: 1px; border-color: Theme.stroke-strong;
-        drop-shadow-blur: 32px; drop-shadow-color: #00000066; drop-shadow-offset-y: 8px;
+        drop-shadow-blur: 48px; drop-shadow-color: #00000066; drop-shadow-offset-y: 16px;
         TouchArea { }
         VerticalLayout {
             Rectangle { height: 56px;
@@ -160,12 +179,16 @@ export component SettingsDialog inherits Rectangle {
                     Section { title: Tr.t("set.appearance");
                         SettingRow { title: Tr.t("set.theme");
                             Segmented { width: 270px; items: [Tr.t("set.theme.system"), Tr.t("set.theme.light"), Tr.t("set.theme.dark")]; index: App.set-theme; picked(i) => { App.set-theme = i; App.set("theme", i); } } }
+                        SettingRow { title: Tr.t("set.accentAuto"); desc: App.accent-auto-ok ? Tr.t("set.accentAuto.d") : Tr.t("set.accentAuto.na");
+                            HorizontalLayout { spacing: 12px;
+                                if App.accent-auto-ok : Rectangle { width: 22px; height: 22px; y: 0px; border-radius: 11px; background: App.system-accent; border-width: 1px; border-color: Theme.stroke-strong; }
+                                FSwitch { checked: App.set-accent-auto && App.accent-auto-ok; toggled(c) => { if (App.accent-auto-ok) { App.set-accent-auto = c; App.set("accent-auto", c ? "1" : "0"); } } } } }
                         SettingRow { title: Tr.t("set.color");
-                            VerticalLayout { spacing: 6px; width: 300px;
+                            VerticalLayout { spacing: 6px; width: 300px; opacity: App.set-accent-auto && App.accent-auto-ok ? 0.4 : 1.0;
                                 Flickable { height: ceil(App.swatches.length / 8) * 32px + 4px; content-width: 300px;
                                     for i in App.swatches.length : Rectangle { x: mod(i, 8) * 36px; y: floor(i / 8) * 32px; width: 30px; height: 28px; border-radius: 14px;
                                         background: App.swatches[i]; border-width: App.set-accent-index == i ? 2px : 0px; border-color: Theme.text;
-                                        TouchArea { mouse-cursor: pointer; clicked => { App.set-accent-index = i; App.set("accent", i); } } } }
+                                        TouchArea { enabled: !(App.set-accent-auto && App.accent-auto-ok); mouse-cursor: pointer; clicked => { App.set-accent-index = i; App.set("accent", i); } } } }
                             } }
                         SettingRow { title: Tr.t("set.material"); desc: App.material-ok ? Tr.t("set.material.d") : Tr.t("set.material.unsupported");
                             Dropdown { width: 150px; items: ["None", "Mica", "Mica Alt", "Acrylic"]; index: App.set-material; picked(i) => { App.set-material = i; App.set("material", i); } } }

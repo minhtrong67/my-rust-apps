@@ -268,3 +268,12 @@ fn old_default_blue_moves_to_the_rust_accent_but_custom_colours_stay() {
     assert_eq!(store::Settings::default().accent, theme::DEFAULT_ACCENT);
     assert!(theme::ACCENTS.iter().any(|a| a.hex == theme::DEFAULT_ACCENT));
 }
+
+#[test]
+fn windows_accent_register_value_decodes_to_rgb() {
+    // #CE422B stored by Windows as 0xAABBGGRR
+    assert_eq!(theme::rgb_from_abgr(0xFF2B42CE), [0xCE, 0x42, 0x2B]);
+    assert_eq!(theme::to_hex(theme::rgb_from_abgr(0xFFD47800)), "#0078d4");
+    let s = store::Settings::default();
+    assert!(!s.accent_auto && !s.filmstrip, "both are opt-in");
+}

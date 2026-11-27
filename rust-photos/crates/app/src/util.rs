@@ -79,3 +79,20 @@ pub fn copy_image(img: &RgbaImage) -> bool {
 pub fn copy_text(t: &str) -> bool {
     arboard::Clipboard::new().and_then(|mut c| c.set_text(t.to_string())).is_ok()
 }
+
+/// Runs decoding work so that a panic inside an image decoder (a corrupt file) fails that one picture instead of the app.
+pub fn guarded<T>(f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or_else(|_| Err("could not decode this file".into()))
+}
+
+/// Writes panics to `crash.log` in the config folder (the release build has no console to show them).
+pub fn install_crash_log() {
+    std::panic::set_hook(Box::new(|info| {
+        use std::io::Write;
+        let dir = rust_photos_core::store::config_dir();
+        let _ = std::fs::create_dir_all(&dir);
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("crash.log")) {
+            let _ = writeln!(f, "[{}] {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), info);
+        }
+    }));
+}

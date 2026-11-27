@@ -85,7 +85,11 @@ impl State {
         let Some(path) = self.current_path() else { return };
         let (tx, rx) = channel();
         let p2 = path.clone();
-        std::thread::spawn(move || worker(p2, rx));
+        std::thread::spawn(move || {
+            if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| worker(p2, rx))).is_err() {
+                post(|s| s.ed_failed("the editor stopped unexpectedly".into()));
+            }
+        });
         let st = EditState::default();
         self.ed = Some(Editor {
             path: path.clone(), tx, saved: st.clone(), hist: vec![st.clone()], st, hi: 0, gen: 0, draft: None, start: None, next_id: 1, sel: None,

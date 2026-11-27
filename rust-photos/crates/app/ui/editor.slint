@@ -84,7 +84,7 @@ component ToolButton inherits Rectangle {
     in property <string> tip;
     in property <bool> on;
     callback clicked();
-    width: 32px; height: 32px; border-radius: 5px;
+    width: 32px; height: 32px; border-radius: 4px;
     border-width: on ? 1px : 0px; border-color: Theme.accent;
     background: on ? Theme.accent.with-alpha(0.15) : ta.has-hover ? Theme.subtle-hover : transparent;
     Icon { glyph: root.glyph; size: 18px; tint: on ? Theme.accent-text : Theme.text; }
@@ -151,7 +151,7 @@ export component EditorView inherits Rectangle {
                 Rectangle { height: 48px;
                     HorizontalLayout { padding: 6px; spacing: 4px;
                         for t[i] in [{ g: @image-url("icons/crop.svg"), k: "ed.crop" }, { g: @image-url("icons/sliders-horizontal.svg"), k: "ed.adjust" }, { g: @image-url("icons/wand-sparkles.svg"), k: "ed.filters" }, { g: @image-url("icons/brush.svg"), k: "ed.draw" }] : Rectangle {
-                            horizontal-stretch: 1; border-radius: 5px; background: App.ed-tab == i ? Theme.subtle-hover : tt.has-hover ? Theme.subtle-hover : transparent;
+                            horizontal-stretch: 1; border-radius: 4px; background: App.ed-tab == i ? Theme.subtle-hover : tt.has-hover ? Theme.subtle-hover : transparent;
                             Rectangle { y: parent.height - 3px; height: 3px; width: 20px; x: (parent.width - 20px) / 2; border-radius: 1.5px; background: App.ed-tab == i ? Theme.accent : transparent; }
                             HorizontalLayout { alignment: center; spacing: 6px; x: 0px; y: 0px; width: parent.width; height: parent.height;
                                 Icon { glyph: t.g; size: 16px; tint: App.ed-tab == i ? Theme.accent-text : Theme.text; }

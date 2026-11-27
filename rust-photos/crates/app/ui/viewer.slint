@@ -55,7 +55,7 @@ export component ViewerView inherits Rectangle {
                     IconBtn { y: 8px; glyph: @image-url("icons/ellipsis.svg"); tip: Tr.t("act.menu");
                         clicked => { more.show(); }
                         more := PopupWindow { x: parent.width - 220px; y: 36px; width: 220px;
-                            Rectangle { background: Theme.card; border-radius: 6px; border-width: 1px; border-color: Theme.stroke-strong; drop-shadow-blur: 16px; drop-shadow-color: #00000040;
+                            Rectangle { background: Theme.flyout; border-radius: 8px; border-width: 1px; border-color: Theme.stroke-strong; drop-shadow-blur: 24px; drop-shadow-color: #00000040;
                                 VerticalLayout { padding: 4px; spacing: 1px;
                                     for it[i] in [
                                         { k: "view-copy", t: Tr.t("act.copyImage") }, { k: "view-copy-path", t: Tr.t("act.copyPath") },
@@ -123,10 +123,11 @@ export component ViewerView inherits Rectangle {
                     IconBtn { y: 6px; glyph: @image-url("icons/scan.svg"); tip: Tr.t("act.fit"); clicked => { root.fit-window(); } }
                     Btn { y: 6px; text: "1:1"; height: 32px; clicked => { root.actual-size(); } }
                     IconBtn { y: 6px; glyph: @image-url("icons/maximize.svg"); tip: Tr.t("act.fullscreen"); clicked => { App.act("fullscreen", 0); } }
+                    IconBtn { y: 6px; glyph: @image-url("icons/gallery-horizontal-end.svg"); active: App.strip-open; tip: Tr.t("view.filmstrip"); clicked => { App.act("strip-toggle", 0); } }
                 }
             }
             // filmstrip
-            if !App.fullscreen && App.strip.length > 1 : Rectangle {
+            if !App.fullscreen && App.strip-open && App.strip.length > 1 : Rectangle {
                 height: 78px; background: Theme.layer;
                 Flickable {
                     content-width: strip-row.preferred-width + 16px;
@@ -152,7 +153,7 @@ export component ViewerView inherits Rectangle {
                 info-col := VerticalLayout {
                     padding: 16px; spacing: 10px;
                     Text { text: Tr.t("info.title"); color: Theme.text; font-size: 16px * Theme.scale; font-weight: 600; }
-                    Rectangle { height: 90px; border-radius: 6px; background: Theme.card; border-width: 1px; border-color: Theme.stroke;
+                    Rectangle { height: 90px; border-radius: 4px; background: Theme.card; border-width: 1px; border-color: Theme.stroke;
                         Text { x: 8px; y: 4px; text: Tr.t("info.histogram"); color: Theme.text-3; font-size: Theme.fs-small; }
                         Path { x: 8px; y: 22px; width: parent.width - 16px; height: parent.height - 28px; viewbox-width: 256; viewbox-height: 100; commands: App.hist-luma; fill: Theme.text-3.with-alpha(0.35); stroke: Theme.text-3; stroke-width: 0.8px; }
                         Path { x: 8px; y: 22px; width: parent.width - 16px; height: parent.height - 28px; viewbox-width: 256; viewbox-height: 100; commands: App.hist-r; stroke: #e5484d; stroke-width: 0.8px; opacity: 0.8; }

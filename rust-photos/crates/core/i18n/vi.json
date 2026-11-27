@@ -165,7 +165,7 @@
  "tr.zoom": "Thu phóng",
  "view.of": "{a} / {b}",
  "view.loadFail": "Không thể tải ảnh này",
- "view.filmstrip": "Dải ảnh",
+ "view.filmstrip": "Hiện dải ảnh nhỏ",
  "view.shortcuts": "Phím tắt",
  "ed.crop": "Cắt",
  "ed.adjust": "Điều chỉnh",
@@ -384,5 +384,8 @@
  "ui.moreTools": "Thêm công cụ",
  "ui.collapse": "Thu gọn",
  "ui.expand": "Mở rộng",
- "ui.scrollTop": "Lên đầu trang"
+ "ui.scrollTop": "Lên đầu trang",
+ "set.accentAuto": "Dùng màu nhấn của Windows",
+ "set.accentAuto.d": "Tự lấy màu bạn chọn trong cài đặt cá nhân hóa của Windows và cập nhật khi bạn đổi",
+ "set.accentAuto.na": "Chỉ có trên Windows"
 }

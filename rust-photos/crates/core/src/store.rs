@@ -74,6 +74,10 @@ pub struct Settings {
     pub version: u32,
     pub theme: ThemeMode,
     pub accent: String,
+    /// follow the accent colour chosen in Windows instead of `accent`
+    pub accent_auto: bool,
+    /// show the thumbnail strip under a picture in the viewer
+    pub filmstrip: bool,
     pub material: Material,
     pub nav_compact: bool,
     pub font_size: FontSize,
@@ -107,6 +111,8 @@ impl Default for Settings {
             version: SETTINGS_VERSION,
             theme: ThemeMode::System,
             accent: crate::theme::DEFAULT_ACCENT.into(),
+            accent_auto: false,
+            filmstrip: false,
             material: Material::Mica,
             nav_compact: false,
             font_size: FontSize::Md,

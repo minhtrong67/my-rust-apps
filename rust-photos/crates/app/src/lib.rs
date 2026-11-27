@@ -18,6 +18,7 @@ use std::rc::Rc;
 
 /// Starts the app. `heap_mb` reports (live, peak) Rust heap in MB for the FP_STATS title bar.
 pub fn run_app(heap_mb: fn() -> (usize, usize)) {
+    util::install_crash_log();
     let t0 = std::time::Instant::now();
     let args: Vec<String> = std::env::args().collect();
     let startup = library::arg_target(&args);
@@ -48,8 +49,12 @@ pub fn run_app(heap_mb: fn() -> (usize, usize)) {
     let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
     let cache_dir = rust_photos_core::thumbs::cache_dir();
     {
+        // old thumbnails are cleaned up well after start, so it never competes with the first screen of pictures
         let d = cache_dir.clone();
-        std::thread::spawn(move || rust_photos_core::thumbs::prune(&d));
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(10));
+            rust_photos_core::thumbs::prune(&d);
+        });
     }
     let st = State::new(ui.as_weak(), lang_cell, settings.clone(), UserData::load(), cache_dir, cores.saturating_sub(1).clamp(2, 4), t0);
     state::install(st);
@@ -142,7 +147,7 @@ pub fn run_app(heap_mb: fn() -> (usize, usize)) {
     let poll = slint::Timer::default();
     {
         let req = request.clone();
-        poll.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || {
+        poll.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(1000), move || {
             if let Ok(p) = std::fs::read_to_string(&req) {
                 let _ = std::fs::remove_file(&req);
                 let p = p.trim().to_string();

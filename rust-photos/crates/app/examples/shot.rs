@@ -73,17 +73,31 @@ fn main() {
     app.set_view_name("Dalat trip 12.jpg".into());
     app.set_view_index_text("3 of 19".into());
     app.set_has_prev(true); app.set_has_next(true);
-    app.set_info_open(true);
+    app.set_info_open(false);
+    app.set_strip_open(false);
     app.set_hist_luma("M 0 100 L 40 30 L 120 60 L 200 20 L 255 100 Z".into());
     app.set_info_rows(ModelRc::new(VecModel::from(vec![InfoRow { label: "Name".into(), value: "Dalat trip 12.jpg".into() }, InfoRow { label: "Dimensions".into(), value: "4032 × 3024".into() }, InfoRow { label: "Camera".into(), value: "Apple iPhone 15".into() }])));
     let strip: Vec<Strip> = (0..9).map(|i| Strip { idx: i, thumb: pic(i as u32 * 5 + 1, 100, 100), current: i == 4, loaded: true }).collect();
     app.set_strip(ModelRc::new(VecModel::from(strip)));
     save(&win, w, h, &format!("viewer-{sfx}"));
+    app.set_strip_open(true);
+    save(&win, w, h, &format!("viewer-strip-{sfx}"));
+    app.set_strip_open(false);
+    // confirm dialog
+    app.set_view(0);
+    app.set_confirm_title("Delete this picture?".into());
+    app.set_confirm_desc("\"Dalat trip 12.jpg\" will be moved to the Recycle Bin.".into());
+    app.set_confirm_yes("Delete".into());
+    app.set_confirm_open(true);
+    save(&win, w, h, &format!("confirm-{sfx}"));
+    app.set_confirm_open(false);
     // settings
     app.set_view(0);
     let sw: Vec<slint::Color> = ["#CE422B", "#F74C00", "#B7410E", "#DEA584", "#0078D4", "#0063B1", "#0099BC", "#00B7C3", "#038387", "#10893E", "#6B69D6", "#8764B8", "#B146C2", "#E3008C", "#D13438", "#DA3B01", "#F7630C", "#FF8C00", "#68768A"].iter().map(|h| { let n = u32::from_str_radix(&h[1..], 16).unwrap(); slint::Color::from_rgb_u8((n >> 16) as u8, (n >> 8) as u8, n as u8) }).collect();
     app.set_swatches(ModelRc::new(VecModel::from(sw)));
     app.set_settings_open(true);
+    app.set_accent_auto_ok(true);
+    app.set_system_accent(slint::Color::from_rgb_u8(0x00, 0x78, 0xd4));
     save(&win, w, h, &format!("settings-{sfx}"));
 
     // editor

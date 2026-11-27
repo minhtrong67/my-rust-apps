@@ -165,7 +165,7 @@
  "tr.zoom": "Zoom",
  "view.of": "{a} of {b}",
  "view.loadFail": "Could not load this picture",
- "view.filmstrip": "Filmstrip",
+ "view.filmstrip": "Show thumbnails",
  "view.shortcuts": "Keyboard shortcuts",
  "ed.crop": "Crop",
  "ed.adjust": "Adjust",
@@ -384,5 +384,8 @@
  "ui.moreTools": "More tools",
  "ui.collapse": "Collapse",
  "ui.expand": "Expand",
- "ui.scrollTop": "Back to top"
+ "ui.scrollTop": "Back to top",
+ "set.accentAuto": "Match Windows accent color",
+ "set.accentAuto.d": "Follows the color you chose in Windows personalization and updates when you change it",
+ "set.accentAuto.na": "Only available on Windows"
 }

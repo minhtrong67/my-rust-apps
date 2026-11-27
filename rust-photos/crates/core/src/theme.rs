@@ -30,6 +30,11 @@ pub const ACCENTS: [Accent; 19] = [
     Accent { id: "steel", hex: "#68768A", vi: "Xám thép", en: "Steel" },
 ];
 
+/// Windows stores the accent colour as 0xAABBGGRR; this returns [r, g, b].
+pub fn rgb_from_abgr(v: u32) -> [u8; 3] {
+    [(v & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, ((v >> 16) & 0xFF) as u8]
+}
+
 pub fn parse_hex(hex: &str) -> [u8; 3] {
     let h = hex.trim().trim_start_matches('#');
     let n = u32::from_str_radix(&format!("{:0<6}", &h[..h.len().min(6)]), 16).unwrap_or(0x0078D4);

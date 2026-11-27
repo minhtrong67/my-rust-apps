@@ -52,6 +52,7 @@ export global App {
     in property <bool> has-next: false;
     in property <[Strip]> strip;
     in-out property <bool> info-open: false;
+    in-out property <bool> strip-open: false;   // thumbnail strip under the picture
     in property <string> info-title;
     in property <[InfoRow]> info-rows;
     in property <string> hist-luma;
@@ -113,6 +114,9 @@ export global App {
     in-out property <bool> set-keep-exif: true;
     in-out property <int> set-quality: 95;
     in-out property <bool> set-reduce-motion: false;
+    in-out property <bool> set-accent-auto: false;
+    in property <bool> accent-auto-ok: false;
+    in property <color> system-accent: #0078d4;
     in-out property <int> set-window-mode: 0;
     in-out property <int> set-slide-interval: 4;
     in-out property <int> set-slide-transition: 0;

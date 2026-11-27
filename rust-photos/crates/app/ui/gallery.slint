@@ -9,7 +9,7 @@ component TileView inherits Rectangle {
     property <bool> hovered: ta.has-hover || fav-ta.has-hover || chk-ta.has-hover;
     property <bool> ctrl;
     clip: true;
-    border-radius: 6px;
+    border-radius: 4px;
     background: Theme.subtle-hover;
     border-width: tile.selected ? 2px : 0px;
     border-color: Theme.accent;
@@ -81,23 +81,23 @@ export component GalleryView inherits Rectangle {
     VerticalLayout {
         // title row
         Rectangle {
-            height: 56px;
+            height: 64px;
             HorizontalLayout {
                 padding-left: 18px; padding-right: 14px; spacing: 10px;
-                Text { text: App.scope-title; font-size: Theme.fs-title; font-weight: 600; color: Theme.text; vertical-alignment: center; }
+                Text { text: App.scope-title; font-size: Theme.fs-header; font-weight: 600; color: Theme.text; vertical-alignment: center; }
                 Text { text: App.count-text; font-size: Theme.fs; color: Theme.text-3; vertical-alignment: center; }
                 Rectangle { horizontal-stretch: 1; }
                 if App.scope == 0 || App.scope == 1 || App.scope == 3 : FTextBox {
-                    width: 220px; y: 12px;
+                    width: 220px; y: 16px;
                     placeholder: Tr.t("gal.search");
                     text: App.search;
                     edited(t) => { App.search-edited(t); }
                 }
-                if App.scope == 0 : Btn { text: Tr.t("gal.openFolder"); glyph: @image-url("icons/folder-open.svg"); y: 12px; accent: true; clicked => { App.act("open-folder", 0); } }
-                if App.scope == 0 : IconBtn { glyph: @image-url("icons/images.svg"); y: 12px; tip: Tr.t("gal.openFiles"); clicked => { App.act("open-files", 0); } }
-                if App.scope == 2 : Btn { text: Tr.t("alb.new"); glyph: @image-url("icons/plus.svg"); y: 12px; accent: true; clicked => { App.act("album-new", 0); } }
-                if App.scope != 2 : IconBtn { glyph: @image-url("icons/list-checks.svg"); y: 12px; active: App.selecting; tip: Tr.t("gal.selectMode"); clicked => { App.act("select-mode", 0); } }
-                IconBtn { glyph: @image-url("icons/refresh-cw.svg"); y: 12px; tip: Tr.t("gal.refresh"); clicked => { App.act("refresh", 0); } }
+                if App.scope == 0 : Btn { text: Tr.t("gal.openFolder"); glyph: @image-url("icons/folder-open.svg"); y: 16px; accent: true; clicked => { App.act("open-folder", 0); } }
+                if App.scope == 0 : IconBtn { glyph: @image-url("icons/images.svg"); y: 16px; tip: Tr.t("gal.openFiles"); clicked => { App.act("open-files", 0); } }
+                if App.scope == 2 : Btn { text: Tr.t("alb.new"); glyph: @image-url("icons/plus.svg"); y: 16px; accent: true; clicked => { App.act("album-new", 0); } }
+                if App.scope != 2 : IconBtn { glyph: @image-url("icons/list-checks.svg"); y: 16px; active: App.selecting; tip: Tr.t("gal.selectMode"); clicked => { App.act("select-mode", 0); } }
+                IconBtn { glyph: @image-url("icons/refresh-cw.svg"); y: 16px; tip: Tr.t("gal.refresh"); clicked => { App.act("refresh", 0); } }
             }
         }
         // selection bar or filters

@@ -71,7 +71,7 @@ impl Pool {
                     while g.is_empty() { g = cv.wait(g).unwrap(); }
                     g.pop().unwrap()
                 };
-                job();
+                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job));
             });
         }
         Pool { q }
@@ -131,6 +131,8 @@ pub struct State {
     pub ms_filter: f64,
     pub ms_rows: f64,
     pub search_timer: slint::Timer,
+    pub accent_timer: slint::Timer,
+    pub last_auto_accent: Option<[u8; 3]>,
     pub thumb_cache: HashMap<String, Image>,
     pub thumb_order: VecDeque<String>,
     // viewer
@@ -195,6 +197,8 @@ impl State {
             ms_filter: 0.0,
             ms_rows: 0.0,
             search_timer: slint::Timer::default(),
+            accent_timer: slint::Timer::default(),
+            last_auto_accent: None,
             thumb_cache: HashMap::new(),
             thumb_order: VecDeque::new(),
             current: None,
@@ -637,7 +641,7 @@ impl State {
     fn request_thumb(&mut self, gen: u64, idx: usize, path: String) {
         let dir = self.cache_dir.clone();
         self.pool.submit(Box::new(move || {
-            if let Ok(img) = thumbs::load_thumb(&dir, Path::new(&path), thumbs::THUMB_SIZE) {
+            if let Ok(img) = guarded(|| thumbs::load_thumb(&dir, Path::new(&path), thumbs::THUMB_SIZE)) {
                 let buf = to_buf(&img);
                 post(move |s| s.thumb_ready(gen, idx, path, buf));
             }
@@ -806,7 +810,7 @@ impl State {
             app.set_view_failed(false);
             let pth = path.clone();
             std::thread::spawn(move || {
-                let r = prepare(&pth).map(Arc::new);
+                let r = guarded(|| prepare(&pth)).map(Arc::new);
                 post(move |s| s.view_decoded(g, pth, r));
             });
         }
@@ -815,7 +819,7 @@ impl State {
             if let Some(p) = self.ctx.get(np).cloned() {
                 if !self.view_cache.contains_key(&p) {
                     std::thread::spawn(move || {
-                        if let Ok(r) = prepare(&p) {
+                        if let Ok(r) = guarded(|| prepare(&p)) {
                             let pp = p.clone();
                             post(move |s| s.cache_prepared(pp, Arc::new(r)));
                         }
@@ -891,6 +895,10 @@ impl State {
     }
 
     fn update_strip(&mut self, pos: usize) {
+        if !self.settings.filmstrip {
+            if self.strip_model.row_count() > 0 { self.strip_model.set_vec(vec![]); }
+            return;
+        }
         let a = pos.saturating_sub(12);
         let b = (pos + 13).min(self.ctx.len());
         let items: Vec<Strip> = (a..b)
@@ -1343,14 +1351,37 @@ impl State {
         let ui = self.ui();
         let th = ui.global::<Theme>();
         th.set_mode(match self.settings.theme { ThemeMode::System => 0, ThemeMode::Light => 1, ThemeMode::Dark => 2 });
-        th.set_acc_light(colors(&theme::accent_shades(&self.settings.accent, false)));
-        th.set_acc_dark(colors(&theme::accent_shades(&self.settings.accent, true)));
+        let accent = self.effective_accent();
+        th.set_acc_light(colors(&theme::accent_shades(&accent, false)));
+        th.set_acc_dark(colors(&theme::accent_shades(&accent, true)));
         th.set_scale(match self.settings.font_size { FontSize::Sm => 0.875, FontSize::Md => 1.0, FontSize::Lg => 1.125 });
         th.set_reduce_motion(self.settings.reduce_motion);
         let dark = th.get_dark();
         let ok = crate::platform::apply_material(&ui, self.settings.material, dark);
         th.set_solid(self.settings.material == Material::None || !ok);
         ui.global::<App>().set_material_ok(ok);
+        // when following Windows, check now and then whether the user changed the colour
+        if self.settings.accent_auto && crate::platform::system_accent().is_some() {
+            self.accent_timer.start(slint::TimerMode::Repeated, std::time::Duration::from_secs(4), || post(|s| s.check_auto_accent()));
+        } else {
+            self.accent_timer.stop();
+        }
+    }
+
+    /// The accent colour in use: the Windows one when "match Windows" is on and readable, else the chosen one.
+    pub fn effective_accent(&self) -> String {
+        if self.settings.accent_auto {
+            if let Some(c) = crate::platform::system_accent() { return theme::to_hex(c); }
+        }
+        self.settings.accent.clone()
+    }
+
+    fn check_auto_accent(&mut self) {
+        let now = crate::platform::system_accent();
+        if now != self.last_auto_accent {
+            self.last_auto_accent = now;
+            self.apply_look();
+        }
     }
 
     pub fn sync_settings_ui(&mut self) {
@@ -1375,6 +1406,10 @@ impl State {
         app.set_set_slide_loop(s.slide.repeat);
         app.set_tile_size(s.tile as i32);
         app.set_group(s.group);
+        app.set_set_accent_auto(s.accent_auto);
+        app.set_accent_auto_ok(crate::platform::system_accent().is_some());
+        app.set_strip_open(s.filmstrip);
+        if let Some(c) = crate::platform::system_accent() { app.set_system_accent(slint::Color::from_rgb_u8(c[0], c[1], c[2])); }
         app.set_nav_compact(s.nav_compact);
         app.set_sort_index(SortKey::ALL.iter().position(|k| *k == s.sort).unwrap_or(0) as i32);
         let sw: Vec<slint::Color> = theme::ACCENTS.iter().map(|a| { let c = theme::parse_hex(a.hex); slint::Color::from_rgb_u8(c[0], c[1], c[2]) }).collect();
@@ -1401,6 +1436,7 @@ impl State {
         let mut relayout = 0;
         match key {
             "theme" => { self.settings.theme = [ThemeMode::System, ThemeMode::Light, ThemeMode::Dark][i.clamp(0, 2) as usize]; self.apply_look(); }
+            "accent-auto" => { self.settings.accent_auto = b; self.last_auto_accent = crate::platform::system_accent(); self.apply_look(); }
             "accent" => { if let Some(a) = theme::ACCENTS.get(i as usize) { self.settings.accent = a.hex.into(); self.apply_look(); } }
             "material" => { self.settings.material = [Material::None, Material::Mica, Material::MicaAlt, Material::Acrylic][i.clamp(0, 3) as usize]; self.apply_look(); }
             "font-size" => { self.settings.font_size = [FontSize::Sm, FontSize::Md, FontSize::Lg][i.clamp(0, 2) as usize]; self.apply_look(); }
@@ -1546,6 +1582,13 @@ impl State {
             "view-edit" => self.open_editor(),
             "view-rotate" => { if let Some(p) = self.current_path() { self.rotate(p, i as u32); } }
             "slideshow" => self.toggle_slideshow(),
+            "strip-toggle" => {
+                self.settings.filmstrip = !self.settings.filmstrip;
+                app.set_strip_open(self.settings.filmstrip);
+                self.save_settings();
+                let pos = self.pos();
+                self.update_strip(pos);
+            }
             "info" => {}
             "zoom-text" => app.set_zoom_text(format!("{i}%").into()),
             "view-copy" => { if let Some(p) = self.current_path() { self.copy_image_of(p); } }
