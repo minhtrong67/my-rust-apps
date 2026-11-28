@@ -131,6 +131,7 @@ pub fn run_app(heap_mb: fn() -> (usize, usize)) {
         ui.window().on_winit_window_event(move |_w, e| {
             match e {
                 WindowEvent::HoveredFile(_) => { if let Some(u) = weak.upgrade() { u.global::<App>().set_drop_active(true); } }
+                WindowEvent::Focused(true) => { run(|s| s.refresh_if_changed()); }
                 WindowEvent::HoveredFileCancelled => { if let Some(u) = weak.upgrade() { u.global::<App>().set_drop_active(false); } }
                 WindowEvent::DroppedFile(p) => {
                     if let Some(u) = weak.upgrade() { u.global::<App>().set_drop_active(false); }

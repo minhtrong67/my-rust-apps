@@ -1,27 +1,40 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bg" x1="0.1" y1="0" x2="0.9" y2="1">
-      <stop offset="0" stop-color="#F9783A"/>
-      <stop offset="0.55" stop-color="#D14B22"/>
-      <stop offset="1" stop-color="#9C350F"/>
+    <linearGradient id="bg" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#3A2F2A"/>
+      <stop offset="1" stop-color="#14100E"/>
     </linearGradient>
-    <linearGradient id="hill" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#FFD9C4"/>
+    <linearGradient id="gear" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#FF9A5C"/>
+      <stop offset="0.5" stop-color="#E2531F"/>
+      <stop offset="1" stop-color="#9A3410"/>
     </linearGradient>
-    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"/>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2A1F1A"/>
+      <stop offset="1" stop-color="#0E0B0A"/>
+    </linearGradient>
+    <radialGradient id="glass" cx="0.38" cy="0.34" r="0.8">
+      <stop offset="0" stop-color="#FFB27E"/>
+      <stop offset="0.32" stop-color="#C2410C"/>
+      <stop offset="0.75" stop-color="#4A1D0B"/>
+      <stop offset="1" stop-color="#1B0D07"/>
+    </radialGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
       <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
     </linearGradient>
     <clipPath id="sq"><rect x="16" y="16" width="480" height="480" rx="112"/></clipPath>
-    <clipPath id="inside"><rect x="109" y="133" width="294" height="246" rx="24"/></clipPath>
   </defs>
   <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
-  <rect x="16" y="16" width="480" height="260" fill="url(#gloss)" clip-path="url(#sq)"/>
-  <rect x="98" y="122" width="316" height="268" rx="34" fill="none" stroke="#FFFFFF" stroke-width="22"/>
-  <g clip-path="url(#inside)">
-    <circle cx="318" cy="208" r="32" fill="#FFFFFF"/>
-    <path d="M80 400 L196 252 L268 330 L322 270 L430 400 Z" fill="url(#hill)"/>
-    <path d="M196 252 L226 290 L206 300 L190 284 L170 296 Z" fill="#E8763F" opacity="0.55"/>
-  </g>
+  <rect x="16" y="16" width="480" height="250" fill="url(#sheen)" clip-path="url(#sq)"/>
+  <rect x="17" y="17" width="478" height="478" rx="111" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="2"/>
+  <path d="M224.5 101.2 L232.7 71.5 L279.3 71.5 L287.5 101.2 A158 158 0 0 1 306.1 106.2 L328.1 84.5 L368.5 107.8 L360.7 137.7 A158 158 0 0 1 374.3 151.3 L404.2 143.5 L427.5 183.9 L405.8 205.9 A158 158 0 0 1 410.8 224.5 L440.5 232.7 L440.5 279.3 L410.8 287.5 A158 158 0 0 1 405.8 306.1 L427.5 328.1 L404.2 368.5 L374.3 360.7 A158 158 0 0 1 360.7 374.3 L368.5 404.2 L328.1 427.5 L306.1 405.8 A158 158 0 0 1 287.5 410.8 L279.3 440.5 L232.7 440.5 L224.5 410.8 A158 158 0 0 1 205.9 405.8 L183.9 427.5 L143.5 404.2 L151.3 374.3 A158 158 0 0 1 137.7 360.7 L107.8 368.5 L84.5 328.1 L106.2 306.1 A158 158 0 0 1 101.2 287.5 L71.5 279.3 L71.5 232.7 L101.2 224.5 A158 158 0 0 1 106.2 205.9 L84.5 183.9 L107.8 143.5 L137.7 151.3 A158 158 0 0 1 151.3 137.7 L143.5 107.8 L183.9 84.5 L205.9 106.2 A158 158 0 0 1 224.5 101.2 Z" fill="url(#gear)"/>
+  <circle cx="256" cy="256" r="128" fill="url(#ring)"/>
+  <circle cx="256" cy="256" r="128" fill="none" stroke="#FFB27E" stroke-opacity="0.35" stroke-width="3"/>
+  <circle cx="256" cy="256" r="100" fill="url(#glass)"/>
+  <circle cx="256" cy="256" r="100" fill="none" stroke="#FF8A4C" stroke-width="7"/>
+  <circle cx="256" cy="256" r="62" fill="none" stroke="#FFD2B4" stroke-opacity="0.45" stroke-width="4"/>
+  <circle cx="256" cy="256" r="30" fill="#14100E" fill-opacity="0.65"/>
+  <ellipse cx="222" cy="214" rx="34" ry="22" transform="rotate(-35 222 214)" fill="#FFFFFF" fill-opacity="0.55"/>
+  <circle cx="292" cy="300" r="9" fill="#FFFFFF" fill-opacity="0.35"/>
 </svg>

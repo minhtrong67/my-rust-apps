@@ -132,6 +132,7 @@ pub struct State {
     pub ms_rows: f64,
     pub search_timer: slint::Timer,
     pub accent_timer: slint::Timer,
+    pub last_scan: std::time::Instant,
     pub last_auto_accent: Option<[u8; 3]>,
     pub thumb_cache: HashMap<String, Image>,
     pub thumb_order: VecDeque<String>,
@@ -198,6 +199,7 @@ impl State {
             ms_rows: 0.0,
             search_timer: slint::Timer::default(),
             accent_timer: slint::Timer::default(),
+            last_scan: std::time::Instant::now(),
             last_auto_accent: None,
             thumb_cache: HashMap::new(),
             thumb_order: VecDeque::new(),
@@ -333,14 +335,33 @@ impl State {
     }
 
     pub fn refresh(&mut self) {
+        self.refresh_impl(false);
+    }
+
+    /// Called when the window is activated again: pictures added or removed while the app was in the background show up
+    /// without pressing refresh. At most every 8 seconds, never while editing, and the gallery is only rebuilt if the folder changed.
+    pub fn refresh_if_changed(&mut self) {
+        if self.last_scan.elapsed() < std::time::Duration::from_secs(8) { return; }
+        if self.ed.is_some() { return; }
+        self.refresh_impl(true);
+    }
+
+    fn signature(list: &[Entry]) -> (usize, u64) {
+        (list.len(), list.iter().fold(0u64, |a, e| a ^ e.mtime.rotate_left((e.size % 61) as u32) ^ e.size))
+    }
+
+    fn refresh_impl(&mut self, only_if_changed: bool) {
         let dir = self.dir.clone();
         let lib = self.is_library;
         let libpath = self.settings.library_path.clone();
         if dir.is_empty() && !lib { return; }
+        self.last_scan = std::time::Instant::now();
+        let old = Self::signature(&self.entries);
         std::thread::spawn(move || {
             let r = if lib { library::library(&libpath) } else { library::open_target(&dir) };
             post(move |s| {
                 if let Ok(o) = r {
+                    if only_if_changed && Self::signature(&o.entries) == old { return; }
                     s.dir = o.dir;
                     s.entries = o.entries;
                     s.load_scope_entries();

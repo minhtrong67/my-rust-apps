@@ -19,6 +19,26 @@ single-instance = "0.3"
 rand = "0.8"
 image = { version = "0.25", default-features = false }
 
+[package.metadata.packager]
+productName = "Rust Photos"
+identifier = "com.minhtrong67.rustphotos"
+publisher = "minhtrong67"
+copyright = "Copyright (c) 2026 minhtrong67"
+longDescription = "A fast native photo viewer and editor for Windows, written in Rust with a Fluent (WinUI 3) look. No WebView2, no JavaScript."
+licenseFile = "../../LICENSE"
+icons = ["assets/icon.ico"]
+formats = ["nsis"]
+# cargo-packager does not compile your app by itself
+beforePackagingCommand = "cargo build --release -p rust-photos"
+
+[package.metadata.packager.nsis]
+installMode = "currentUser"
+installerIcon = "assets/icon.ico"
+compression = "lzma"
+languages = ["English"]
+# offered (unchecked) in the uninstaller as "delete app data"
+appdataPaths = ["$APPDATA/RustPhotos", "$LOCALAPPDATA/RustPhotos"]
+
 [build-dependencies]
 slint-build = "1.19"
 

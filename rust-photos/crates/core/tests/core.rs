@@ -275,5 +275,18 @@ fn windows_accent_register_value_decodes_to_rgb() {
     assert_eq!(theme::rgb_from_abgr(0xFF2B42CE), [0xCE, 0x42, 0x2B]);
     assert_eq!(theme::to_hex(theme::rgb_from_abgr(0xFFD47800)), "#0078d4");
     let s = store::Settings::default();
-    assert!(!s.accent_auto && !s.filmstrip, "both are opt-in");
+    assert!(s.accent_auto, "following the Windows accent is the default");
+    assert!(!s.filmstrip, "the thumbnail strip is opt-in");
+}
+
+#[test]
+fn settings_from_older_versions_switch_to_the_automatic_accent_once() {
+    let mut v2: store::Settings = serde_json::from_str(r##"{"version":2,"accent":"#8764B8","accent_auto":false}"##).unwrap();
+    assert!(v2.migrate());
+    assert!(v2.accent_auto, "turned on by the version 3 migration");
+    assert_eq!(v2.accent, "#8764B8", "the colour used when it is switched off again is kept");
+    // after that the user's own choice is respected
+    v2.accent_auto = false;
+    assert!(!v2.migrate());
+    assert!(!v2.accent_auto);
 }

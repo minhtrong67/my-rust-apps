@@ -154,8 +154,8 @@ export component EditorView inherits Rectangle {
                             horizontal-stretch: 1; border-radius: 4px; background: App.ed-tab == i ? Theme.subtle-hover : tt.has-hover ? Theme.subtle-hover : transparent;
                             Rectangle { y: parent.height - 3px; height: 3px; width: 20px; x: (parent.width - 20px) / 2; border-radius: 1.5px; background: App.ed-tab == i ? Theme.accent : transparent; }
                             HorizontalLayout { alignment: center; spacing: 6px; x: 0px; y: 0px; width: parent.width; height: parent.height;
-                                Icon { glyph: t.g; size: 16px; tint: App.ed-tab == i ? Theme.accent-text : Theme.text; }
-                                Text { text: Tr.t(t.k); color: Theme.text; font-size: Theme.fs-small; vertical-alignment: center; } }
+                                Rectangle { width: 16px; Icon { glyph: t.g; size: 16px; tint: App.ed-tab == i ? Theme.accent-text : Theme.text; x: 0px; y: (parent.height - self.height) / 2; } }
+                                Text { text: Tr.t(t.k); color: App.ed-tab == i ? Theme.text : Theme.text-2; font-size: Theme.fs-small; vertical-alignment: center; } }
                             tt := TouchArea { mouse-cursor: pointer; clicked => { App.act("ed-tab", i); } }
                         }
                     }

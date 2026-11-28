@@ -11,6 +11,11 @@ impl Platform for P {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> { Ok(self.0.clone()) }
 }
 
+/// Where the PNG files go: the first argument after the theme, or the temp folder.
+fn out_dir() -> std::path::PathBuf {
+    std::env::args().nth(2).map(Into::into).unwrap_or_else(|| std::env::temp_dir().join("rust-photos-shots"))
+}
+
 fn pic(seed: u32, w: u32, h: u32) -> Image {
     let mut b = SharedPixelBuffer::<Rgba8Pixel>::new(w, h);
     let px = b.make_mut_slice();
@@ -28,11 +33,13 @@ fn save(win: &Rc<MinimalSoftwareWindow>, w: u32, h: u32, name: &str) {
     win.draw_if_needed(|r| { r.render(&mut buf, w as usize); });
     let mut img = image::RgbaImage::new(w, h);
     for (p, s) in img.pixels_mut().zip(&buf) { *p = image::Rgba([s.red, s.green, s.blue, 255]); }
-    img.save(format!("/tmp/shots/{name}.png")).unwrap();
+    let dir = out_dir();
+    img.save(dir.join(format!("{name}.png"))).unwrap();
 }
 
 fn main() {
-    std::fs::create_dir_all("/tmp/shots").unwrap();
+    std::fs::create_dir_all(out_dir()).unwrap();
+    println!("writing PNG files to {}", out_dir().display());
     let win = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
     slint::platform::set_platform(Box::new(P(win.clone()))).unwrap();
     let ui = AppWindow::new().unwrap();

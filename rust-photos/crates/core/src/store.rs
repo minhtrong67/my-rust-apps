@@ -103,7 +103,7 @@ fn zero_version() -> u32 {
     0
 }
 
-pub const SETTINGS_VERSION: u32 = 2;
+pub const SETTINGS_VERSION: u32 = 3;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -111,7 +111,7 @@ impl Default for Settings {
             version: SETTINGS_VERSION,
             theme: ThemeMode::System,
             accent: crate::theme::DEFAULT_ACCENT.into(),
-            accent_auto: false,
+            accent_auto: true,
             filmstrip: false,
             material: Material::Mica,
             nav_compact: false,
@@ -180,7 +180,10 @@ impl Settings {
     /// a colour the user picked on purpose is kept.
     pub fn migrate(&mut self) -> bool {
         if self.version >= SETTINGS_VERSION { return false; }
-        if self.accent.eq_ignore_ascii_case("#0078D4") { self.accent = crate::theme::DEFAULT_ACCENT.into(); }
+        // v2: Rust palette. Only the old default blue moves to the new default accent; a colour picked on purpose stays.
+        if self.version < 2 && self.accent.eq_ignore_ascii_case("#0078D4") { self.accent = crate::theme::DEFAULT_ACCENT.into(); }
+        // v3: following the Windows accent colour is the default.
+        if self.version < 3 { self.accent_auto = true; }
         self.version = SETTINGS_VERSION;
         true
     }

@@ -71,6 +71,8 @@ export component AppWindow inherits Window {
                 if (e.text == "y" && e.modifiers.control) { App.act("ed-redo", 0); return accept; }
                 if (e.text == "s" && e.modifiers.control) { App.act("ed-save", 0); return accept; }
             }
+            if (e.text == Key.F5) { App.act("refresh", 0); return accept; }
+            if (App.view == 0 && e.text == "o" && e.modifiers.control) { App.act("open-folder", 0); return accept; }
             if (App.view == 0 && e.text == "a" && e.modifiers.control) { App.act("select-all", 0); return accept; }
             if (e.text == "," && e.modifiers.control) { App.settings-open = true; return accept; }
             reject
